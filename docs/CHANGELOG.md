@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-08-18
+
+### Fixed
+
+- Docs-sync CI no longer fails when the `sync-public` and `sync-public-docs` workflows push the public repo concurrently; the sync step now rebases on `main` before pushing.
+
 ## [0.2.4] - 2026-08-18
 
 ### Added
