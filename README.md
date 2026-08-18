@@ -48,7 +48,7 @@ Consumer (standard SDK, zero changes)         Producer side
 
 ## Quickstart
 
-Published as [`aweshare`](https://www.npmjs.com/package/aweshare) on npm (requires Node ≥ 22) and as a Docker image (`ghcr.io/mugpeng/aweshare`). No clone needed.
+Published as [`aweshare`](https://www.npmjs.com/package/aweshare) on npm (requires Node ≥ 22) and as a Docker image (`ghcr.io/wehuman01/aweshare`). No clone needed.
 
 ### 1. Start the hub (operator, one VPS)
 
@@ -64,7 +64,7 @@ aweshare hub serve       # listens on :8787 (put Caddy/nginx TLS in front)
 
 ```bash
 docker run -d --name aweshare-hub --restart unless-stopped \
-  -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/mugpeng/aweshare:latest
+  -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/wehuman01/aweshare:latest
 docker exec aweshare-hub node apps/hub/dist/cli.js init   # first run: prints the admin token, save it
 ```
 
@@ -234,7 +234,7 @@ aweshare hub serve
 aweshare agent doctor
 ```
 
-Releasing: push a `v*` tag with a matching `## [x.y.z]` section in `docs/CHANGELOG.md`; CI publishes the `aweshare` package to npm via Trusted Publishing (OIDC, no token secret) and the Docker image to `ghcr.io/mugpeng/aweshare`.
+Releasing: push a `v*` tag with a matching `## [x.y.z]` section in `docs/CHANGELOG.md`; CI publishes the `aweshare` package to npm via Trusted Publishing (OIDC, no token secret) and the Docker image to `ghcr.io/wehuman01/aweshare`.
 
 Layout: `packages/protocol` (shared wire protocol) · `apps/hub` (HTTP+WS+SQLite+CLI) · `apps/agent` (CLI). Design docs live in `docs/specs/`; the changelog in `docs/CHANGELOG.md`; contribution scope in [CONTRIBUTING.md](./CONTRIBUTING.md).
 

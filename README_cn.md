@@ -48,7 +48,7 @@
 
 ## Quickstart
 
-已发布：npm 包 [`aweshare`](https://www.npmjs.com/package/aweshare)（需 Node ≥ 22）和 Docker 镜像（`ghcr.io/mugpeng/aweshare`），无需 clone 源码。
+已发布：npm 包 [`aweshare`](https://www.npmjs.com/package/aweshare)（需 Node ≥ 22）和 Docker 镜像（`ghcr.io/wehuman01/aweshare`），无需 clone 源码。
 
 ### 1. 启动 Hub（运维者，一台 VPS）
 
@@ -64,7 +64,7 @@ aweshare hub serve       # 监听 :8787（前面套 Caddy/nginx 做 TLS）
 
 ```bash
 docker run -d --name aweshare-hub --restart unless-stopped \
-  -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/mugpeng/aweshare:latest
+  -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/wehuman01/aweshare:latest
 docker exec aweshare-hub node apps/hub/dist/cli.js init   # 首次：生成 admin token，抄下来
 ```
 
@@ -234,7 +234,7 @@ aweshare hub serve
 aweshare agent doctor
 ```
 
-发布：push 一个 `v*` tag（`docs/CHANGELOG.md` 需有对应 `## [x.y.z]` 小节），CI 自动发布 `aweshare-protocol` + `aweshare` 到 npm（需配置 `NPM_TOKEN` secret）并推送 Docker 镜像到 `ghcr.io/mugpeng/aweshare`。
+发布：push 一个 `v*` tag（`docs/CHANGELOG.md` 需有对应 `## [x.y.z]` 小节），CI 自动发布 `aweshare-protocol` + `aweshare` 到 npm（需配置 `NPM_TOKEN` secret）并推送 Docker 镜像到 `ghcr.io/wehuman01/aweshare`。
 
 结构：`packages/protocol`（线协议共享包）· `apps/hub`（HTTP+WS+SQLite+CLI）· `apps/agent`（CLI）。设计文档在 `docs/specs/`，变更记录在 `docs/CHANGELOG.md`，贡献范围见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 

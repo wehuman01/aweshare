@@ -15,7 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
-- Published for general use: [`aweshare`](https://www.npmjs.com/package/aweshare) on npm (`npm install -g aweshare`) and Docker image `ghcr.io/mugpeng/aweshare` (amd64 + arm64). Consumers and producers no longer need to clone the repo; hub operators can `docker run` the published image directly.
+- Published for general use: [`aweshare`](https://www.npmjs.com/package/aweshare) on npm (`npm install -g aweshare`) and Docker image `ghcr.io/wehuman01/aweshare` (amd64 + arm64). Consumers and producers no longer need to clone the repo; hub operators can `docker run` the published image directly.
 - Grant expiry: `aweshare agent grant --expires-in 7d|12h|30m|90s` (and `aweshare hub grant add --expires-in …`, or `expiresAt` ISO timestamp on `PUT /admin/v1/grants`). Expired grants return `403 GRANT_EXPIRED`; re-granting refreshes the expiry. `grant list` shows `expires_at`.
 - Per-consumer limit overrides (sparse, admin-managed): `aweshare hub consumer limits --name NAME [--rps N] [--burst N] [--concurrency N] [--tpm N] [--max-total-tokens N] | --clear`, backed by `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`. Only set keys override; unset keys keep the hub-wide env defaults. Later `PUT`s merge into the stored overrides.
 - TPM: per-consumer tokens-per-minute sliding window (in-memory, like the RPS bucket), enforced as `429 RATE_LIMITED` and recorded from each request's extracted usage.
