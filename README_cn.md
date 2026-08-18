@@ -1,27 +1,33 @@
 <div align="center">
-
-  <img src="logo/logo.webp" alt="aweshare" width="860">
-
+  <img src="./logo/logo.png" alt="aweshare" width="760">
   <h1>aweshare：开源、local-first 的 AI 能力中继</h1>
-
-  <p><strong>开源、local-first 的 AI 能力中继</strong></p>
-
+  <p><strong>开源、local-first 的 AI 能力中继。</strong></p>
+  <p>通过基于授权（grant）的 Hub 共享本地 Ollama/vLLM 或已授权的 OpenAI/Anthropic 后端，消费者用标准 SDK 以 <code>命名空间/别名</code> 调用。</p>
+  <p><strong>上游 API Key 永不离开生产者设备。</strong></p>
   <p>
     <a href="./README.md">English</a> ·
     <strong>简体中文</strong> ·
     <a href="https://www.npmjs.com/package/aweshare">npm</a> ·
     <a href="https://github.com/wehuman01/aweshare">GitHub</a>
   </p>
-
   <p>
-    <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/npm/v/aweshare?style=flat-square" alt="npm version"></a>
-    <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/npm/dt/aweshare?style=flat-square" alt="npm downloads"></a>
-    <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
-    <a href="https://github.com/wehuman01/aweshare/pkgs/container/aweshare"><img src="https://img.shields.io/badge/docker-ghcr.io%2Fwehuman01%2Faweshare-2496ED?style=flat-square&logo=docker" alt="Docker"></a>
-    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-22C55E?style=flat-square" alt="License"></a>
-    <img src="https://img.shields.io/badge/status-beta-c96a3d?style=flat-square" alt="Status">
+    <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
-
+  <p>
+    <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.2-7C3AED?style=flat-square" alt="Version"></a>
+    <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
+    <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-22C55E?style=flat-square" alt="License"></a>
+    <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/status-beta-c96a3d?style=flat-square" alt="Status">
+    <img src="https://img.shields.io/badge/docker-ghcr.io%2Fwehuman01%2Faweshare-2496ED?style=flat-square&logo=docker" alt="Docker image">
+    <img src="https://img.shields.io/badge/protocol-OpenAI%20%7C%20Anthropic-0ea5a4?style=flat-square" alt="Protocols">
+    <img src="https://img.shields.io/badge/platform-docker%20%7C%20npm%20%7C%20node-334155?style=flat-square" alt="Platform">
+    <img src="https://img.shields.io/npm/dt/aweshare?style=flat-square" alt="npm downloads">
+    <img src="https://img.shields.io/github/stars/wehuman01/aweshare?style=flat-square" alt="GitHub stars">
+    <img src="https://img.shields.io/badge/deploy-self%20hosted-334155?style=flat-square" alt="Self hosted">
+  </p>
 </div>
 
 生产者在自己的电脑上跑一个轻量 Agent，把本地 Ollama/vLLM 或**已获授权**的 OpenAI/Anthropic 后端共享出去；上游 API Key 只存在生产者设备上，只由本地 Agent 在转发时注入。消费者像用普通模型厂商一样，把标准 OpenAI/Anthropic SDK 指向 Hub，用 `命名空间/别名` 调用模型。

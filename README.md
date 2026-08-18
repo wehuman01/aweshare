@@ -1,27 +1,33 @@
 <div align="center">
-
-  <img src="logo/logo.webp" alt="aweshare" width="860">
-
+  <img src="./logo/logo.png" alt="aweshare" width="760">
   <h1>aweshare: Local-first AI Capability Relay</h1>
-
-  <p><strong>Open-source, local-first AI capability relay</strong></p>
-
+  <p><strong>An open-source, local-first AI capability relay.</strong></p>
+  <p>Share local Ollama/vLLM or authorized OpenAI/Anthropic backends through a grant-based hub, consumed with standard SDKs via <code>namespace/alias</code>.</p>
+  <p><strong>Upstream API keys never leave the producer's device.</strong></p>
   <p>
     <strong>English</strong> ·
     <a href="./README_cn.md">简体中文</a> ·
     <a href="https://www.npmjs.com/package/aweshare">npm</a> ·
     <a href="https://github.com/wehuman01/aweshare">GitHub</a>
   </p>
-
   <p>
-    <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/npm/v/aweshare?style=flat-square" alt="npm version"></a>
-    <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/npm/dt/aweshare?style=flat-square" alt="npm downloads"></a>
-    <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
-    <a href="https://github.com/wehuman01/aweshare/pkgs/container/aweshare"><img src="https://img.shields.io/badge/docker-ghcr.io%2Fwehuman01%2Faweshare-2496ED?style=flat-square&logo=docker" alt="Docker"></a>
-    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-22C55E?style=flat-square" alt="License"></a>
-    <img src="https://img.shields.io/badge/status-beta-c96a3d?style=flat-square" alt="Status">
+    <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
-
+  <p>
+    <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.2-7C3AED?style=flat-square" alt="Version"></a>
+    <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
+    <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-22C55E?style=flat-square" alt="License"></a>
+    <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/status-beta-c96a3d?style=flat-square" alt="Status">
+    <img src="https://img.shields.io/badge/docker-ghcr.io%2Fwehuman01%2Faweshare-2496ED?style=flat-square&logo=docker" alt="Docker image">
+    <img src="https://img.shields.io/badge/protocol-OpenAI%20%7C%20Anthropic-0ea5a4?style=flat-square" alt="Protocols">
+    <img src="https://img.shields.io/badge/platform-docker%20%7C%20npm%20%7C%20node-334155?style=flat-square" alt="Platform">
+    <img src="https://img.shields.io/npm/dt/aweshare?style=flat-square" alt="npm downloads">
+    <img src="https://img.shields.io/github/stars/wehuman01/aweshare?style=flat-square" alt="GitHub stars">
+    <img src="https://img.shields.io/badge/deploy-self%20hosted-334155?style=flat-square" alt="Self hosted">
+  </p>
 </div>
 
 Producers run a lightweight agent on their own machine and share local Ollama/vLLM or **authorized** OpenAI/Anthropic backends. Upstream API keys live only on the producer's device and are injected by the local agent at forwarding time. Consumers point a standard OpenAI/Anthropic SDK at the hub and call models by `namespace/alias` — exactly like using any other model vendor.
