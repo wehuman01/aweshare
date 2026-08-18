@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-18
+
+### Changed
+
+- Docker image renamed to `ghcr.io/wehuman01/aweshare` and repository moved to `wehuman01/aweshare-source`; `release.yml`, `docker-compose.yml`, `package.json` repository URLs, and README install snippets updated. English README releasing section updated to reflect npm Trusted Publishing (OIDC).
+
 ## [0.2.1] - 2026-08-18
 
 ### Changed

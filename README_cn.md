@@ -4,9 +4,7 @@
 
 # aweshare
 
-**Local-first 的 AI 能力中继**
-
-> **说明：** 源代码已不在本仓库维护。本仓库保留公开文档，产品仍可通过 npm 获取。
+**开源、local-first 的 AI 能力中继**
 
 [English](./README.md) · **简体中文**
 

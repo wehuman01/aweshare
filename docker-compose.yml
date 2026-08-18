@@ -1,0 +1,18 @@
+services:
+  hub:
+    # published image (v0.2.0+) — hub only, stateless code + /data volume
+    image: ghcr.io/wehuman01/aweshare:latest
+    # building from source instead? comment the line above, uncomment below
+    # build: .
+    restart: unless-stopped
+    ports:
+      - '8787:8787'
+    volumes:
+      - ./data:/data
+    environment:
+      AWESHARE_HUB_HOST: 0.0.0.0
+      AWESHARE_HUB_PORT: 8787
+      # tuning (defaults shown)
+      AWESHARE_CONSUMER_RPS: 10
+      AWESHARE_CONSUMER_BURST: 20
+      AWESHARE_CONSUMER_CONCURRENCY: 8

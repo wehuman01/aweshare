@@ -4,9 +4,7 @@
 
 # aweshare
 
-**Local-first AI capability relay**
-
-> **Note:** The source code is no longer maintained in this repository. This repo keeps the public documentation; the product is still available on npm.
+**Open-source, local-first AI capability relay**
 
 **English** · [简体中文](./README_cn.md)
 
