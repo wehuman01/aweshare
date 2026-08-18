@@ -2,11 +2,25 @@
 
   <img src="logo/logo.webp" alt="aweshare" width="860">
 
-# aweshare
+  <h1>aweshare：开源、local-first 的 AI 能力中继</h1>
 
-**开源、local-first 的 AI 能力中继**
+  <p><strong>开源、local-first 的 AI 能力中继</strong></p>
 
-[English](./README.md) · **简体中文**
+  <p>
+    <a href="./README.md">English</a> ·
+    <strong>简体中文</strong> ·
+    <a href="https://www.npmjs.com/package/aweshare">npm</a> ·
+    <a href="https://github.com/wehuman01/aweshare">GitHub</a>
+  </p>
+
+  <p>
+    <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/npm/v/aweshare?style=flat-square" alt="npm version"></a>
+    <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/npm/dt/aweshare?style=flat-square" alt="npm downloads"></a>
+    <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
+    <a href="https://github.com/wehuman01/aweshare/pkgs/container/aweshare"><img src="https://img.shields.io/badge/docker-ghcr.io%2Fwehuman01%2Faweshare-2496ED?style=flat-square&logo=docker" alt="Docker"></a>
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-22C55E?style=flat-square" alt="License"></a>
+    <img src="https://img.shields.io/badge/status-beta-c96a3d?style=flat-square" alt="Status">
+  </p>
 
 </div>
 
