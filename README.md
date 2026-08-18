@@ -1,0 +1,248 @@
+<div align="center">
+
+  <img src="logo/logo.webp" alt="aweshare" width="860">
+
+# aweshare
+
+**Local-first AI capability relay**
+
+> **Note:** The source code is no longer maintained in this repository. This repo keeps the public documentation; the product is still available on npm.
+
+**English** · [简体中文](./README_cn.md)
+
+</div>
+
+Producers run a lightweight agent on their own machine and share local Ollama/vLLM or **authorized** OpenAI/Anthropic backends. Upstream API keys live only on the producer's device and are injected by the local agent at forwarding time. Consumers point a standard OpenAI/Anthropic SDK at the hub and call models by `namespace/alias` — exactly like using any other model vendor.
+
+```
+Consumer (standard SDK, zero changes)         Producer side
+┌───────────────────────┐            ┌────────────────────────────┐
+│ Claude Code           │            │ aweshare agent (Node CLI)   │
+│  ANTHROPIC_BASE_URL ──┼──► HTTPS ──┤  ~/.aweshare/config.toml   │
+│ OpenAI SDK / Codex    │            │  ~/.aweshare/secrets.json  │
+└───────────────────────┘            │   │ upstream key injection  │
+           │ /v1/messages            │   ▼ (the only place it happens)
+           │ /v1/chat/completions    │  Ollama / vLLM / OpenAI / Anthropic
+           ▼                         │
+┌─────────────────────────────┐      │
+│ aweshare hub (public, 1 node)│◄───── WSS reverse tunnel (agent dials out)
+│ auth / grants / route / meter│      no public IP, no port forwarding needed
+└─────────────────────────────┘
+```
+
+- **Grant-based trust**: consumers can only use aliases explicitly granted to them. No payments, no marketplace.
+- **Namespaced aliases**: `peng/gpt-4o` is globally unique with one owner — routing is a deterministic lookup.
+- v1 relays **native transparent SSE** for OpenAI↔OpenAI (chat completions and Responses), Anthropic↔Anthropic. No cross-protocol conversion, no smart routing, no web console.
+
+## Trust boundary (read this first)
+
+- To route and meter, **consumer prompts and model responses transit the hub in plaintext — this is not end-to-end encryption**. The hub persists no request/response content, but the hub operator can technically see it. Only use a hub instance you trust — which is why the hub is open source and self-hostable.
+- Upstream API keys never leave the producer's device and are never sent to consumers; the hub database stores only SHA-256 hashes of tokens.
+
+### Compliance and disclaimer
+
+- aweshare is relay software: it cannot and does not judge whether you are allowed to share a given upstream key or subscription — that question is between you and the upstream provider. Being able to call an API yourself does not mean you may resell or re-provide it to third parties.
+- Before sharing anything, read the upstream's terms (account rules, subscription and seat limits, forwarding, commercial-use clauses). Sharing a personal-subscription key — coding plans included — with third parties likely violates those terms; self-hosted open models have no such issue. **When in doubt, don't share.**
+- The producer bears the consequences of sharing (key revocation, account suspension or termination by the upstream). The hub operator is responsible for operating the hub lawfully and for informing consumers of the plaintext-transit boundary above.
+- The software is provided "as is" under the [MIT license](./LICENSE), without warranty of any kind. The authors and contributors are not liable for how aweshare is used or for any damage arising from sharing access through it.
+
+## Quickstart
+
+Published as [`aweshare`](https://www.npmjs.com/package/aweshare) on npm (requires Node ≥ 22) and as a Docker image (`ghcr.io/mugpeng/aweshare`). No clone needed.
+
+### 1. Start the hub (operator, one VPS)
+
+**npm** (simplest):
+
+```bash
+npm install -g aweshare
+aweshare hub init        # data in ~/.aweshare-hub; prints the admin token — save it
+aweshare hub serve       # listens on :8787 (put Caddy/nginx TLS in front)
+```
+
+**docker**:
+
+```bash
+docker run -d --name aweshare-hub --restart unless-stopped \
+  -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/mugpeng/aweshare:latest
+docker exec aweshare-hub node apps/hub/dist/cli.js init   # first run: prints the admin token, save it
+```
+
+Then issue tokens (admin token in hand):
+
+```bash
+aweshare hub token issue --role producer --name peng     # → asp_..., give to the producer
+aweshare hub token issue --role consumer --name alice    # → asc_..., give to the consumer
+```
+
+The producer's `name` becomes their alias namespace (the `peng/` in `peng/gpt-4o`).
+
+### 2. Producer first run (in this order)
+
+```bash
+npm install -g aweshare   # ⓪ once, on the producer machine (Node ≥ 22)
+
+# ① init: writes ~/.aweshare/config.toml + secrets.json (0600)
+aweshare agent init --hub https://hub.example.com --token asp_...
+
+# ② Edit the config (see below); put upstream keys in secrets.json — they never leave this machine
+
+# ③ doctor: pre-flight checks, ordered to find the first failing link
+aweshare agent doctor
+
+# ④ Grant a consumer
+aweshare agent grant --alias peng/qwen2.5.7b --consumer alice
+#    time-limited trial: add --expires-in 7d (re-granting refreshes the expiry)
+
+# ⑤ Start (long-running; when it stops, aliases go offline and consumers get 503)
+aweshare agent start
+```
+
+### 3. Consumer first run (in this order)
+
+```bash
+# ① one small curl to prove the path
+curl https://hub.example.com/v1/chat/completions \
+  -H "Authorization: Bearer asc_..." -H "content-type: application/json" \
+  -d '{"model":"peng/qwen2.5.7b","messages":[{"role":"user","content":"ping"}]}'
+
+# ② configure your tool (below) → run one minimal task
+# ③ check usage: aweshare hub usage --alias peng/qwen2.5.7b
+# ④ only then move to real workloads
+```
+
+## Consumer tool configuration
+
+**OpenAI SDK / any OpenAI-compatible tool**
+
+```ts
+const client = new OpenAI({ baseURL: 'https://hub.example.com/v1', apiKey: 'asc_...' })
+await client.chat.completions.create({ model: 'peng/gpt-4o', messages: [...] })
+```
+
+**Claude Code** (the key is the `asc_` consumer key — **not** any upstream x-api-key)
+
+```bash
+export ANTHROPIC_BASE_URL=https://hub.example.com
+export ANTHROPIC_API_KEY=asc_...
+claude --model peng/sonnet
+```
+
+If Claude Code has a stale OAuth login it overrides env config — switch with `/login` or clean stored credentials.
+
+**Codex** (the default Responses wire protocol works — the alias must be backed by a `responses`-protocol offering; `wire_api = "chat"` against an `openai`-protocol offering also works)
+
+```toml
+[model_providers.aweshare]
+base_url = "https://hub.example.com/v1"
+```
+
+**Discovering models**: `GET /v1/models` (OpenAI SDK `client.models.list()`) returns every alias granted to the key, with online status.
+
+## Producer config reference (~/.aweshare/config.toml)
+
+```toml
+hubUrl = "https://hub.example.com"
+token = "asp_..."
+
+[[backends]]
+id = "ollama"
+protocol = "openai"                      # openai-style baseUrl includes /v1 (SDK convention)
+baseUrl = "http://127.0.0.1:11434/v1"
+
+[[backends]]
+id = "anthropic-main"
+protocol = "anthropic"                   # anthropic-style baseUrl excludes /v1 (agent adds it)
+baseUrl = "https://api.anthropic.com"
+keyRef = "anthropic-key"                 # key lives in secrets.json under this name
+
+[[backends]]
+id = "glm-responses"
+protocol = "responses"                   # responses-style baseUrl includes the version path
+baseUrl = "https://open.bigmodel.cn/api/v1"
+keyRef = "glm-key"                       # e.g. a GLM coding-plan key (Codex-ready)
+
+[[offerings]]
+alias = "peng/qwen2.5.7b"                # namespace must be your producer name
+backend = "ollama"
+upstreamModel = "qwen2.5:7b"             # the real backend id (full tag from `ollama list`)
+maxConcurrency = 1                       # start at 1 for local models; raise for cloud APIs
+```
+
+Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; keep `secrets.json` at 0600 and out of git/screenshots; rotate on suspected leaks. Before sharing, check the upstream's terms: account rules, subscription limits, forwarding and commercial-use constraints.
+
+## Consumer limits (hub-wide defaults + per-consumer overrides)
+
+Every consumer gets the hub-wide defaults (`AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY`, see Operations). On top of that, the hub admin can set **sparse per-consumer overrides** — only the keys you set take effect, everything else keeps the defaults:
+
+```bash
+aweshare hub consumer limits --name alice            # show current overrides
+aweshare hub consumer limits --name alice --tpm 60000 --max-total-tokens 5000000
+aweshare hub consumer limits --name alice --rps 2    # later calls merge, not replace
+aweshare hub consumer limits --name alice --clear    # back to hub-wide defaults
+```
+
+| Key | Meaning | Enforcement |
+|---|---|---|
+| `rps` / `burst` / `maxConcurrent` | override the hub-wide rate/inflight defaults for this consumer | 429 `RATE_LIMITED` |
+| `tpm` | max tokens (prompt + completion) in any sliding 60s window | 429 `RATE_LIMITED` (in-memory window, like the RPS bucket) |
+| `maxTotalTokens` | lifetime token budget for this consumer | 429 `QUOTA_EXCEEDED` (sums `usage_events`) |
+
+Grants can also carry an expiry: `aweshare hub grant add --alias peng/gpt-4o --consumer alice --expires-in 7d` (or `aweshare agent grant … --expires-in 7d` on the producer side). An expired grant returns `403 GRANT_EXPIRED`; re-granting refreshes the expiry.
+
+Honest limits: token-based caps count what upstreams report — Ollama streams report no usage, so they contribute 0. TPM is best-effort (concurrent requests that all pass before any finishes can overshoot); the lifetime budget is exact because it sums persisted rows.
+
+## Endpoints and errors
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /v1/chat/completions` · `POST /v1/messages` · `POST /v1/responses` | inference (Bearer or `x-api-key`) |
+| `GET /v1/models` | aliases visible to this key, with status |
+| `GET /healthz` | liveness |
+| `/admin/v1/*` | token/grant/usage management (admin or producer token) · consumer limit overrides: `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits` (admin only) |
+
+Error semantics: `401` invalid key · `403` not granted or `GRANT_EXPIRED` · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`QUOTA_EXCEEDED` = lifetime token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
+
+Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Producers list grants with `aweshare agent list`; query usage with `aweshare hub usage`.
+
+## Operations
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | data dir (SQLite/pepper/admin token; volume-mount = backup) |
+| `AWESHARE_HUB_PORT` / `HOST` | 8787 / 0.0.0.0 | listen address |
+| `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | per-consumer limits |
+| `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 300000 | response-head timeout / stream idle timeout |
+| `AWESHARE_MAX_BODY_BYTES` | 32MB | request body cap |
+
+Health: agent heartbeats every 15s, silent 45s = dead; backends with 2 consecutive AUTH/QUOTA failures auto-degrade (alias shows `degraded`, dispatch stops), 30s probes recover. A new connection with the same producer token replaces the old one (latest-wins).
+
+## Development
+
+```bash
+pnpm install
+pnpm test        # 98 tests: protocol / hub contract (fake agent vs real hub) / agent unit / e2e (real SDKs)
+pnpm build       # tsc -b, whole monorepo
+pnpm check       # biome
+```
+
+To run the CLIs from a source checkout without `node apps/.../dist/cli.js`, link them once after building:
+
+```bash
+npm link                 # or: pnpm link --global — exposes the single `aweshare` bin
+aweshare hub serve
+aweshare agent doctor
+```
+
+Releasing: push a `v*` tag with a matching `## [x.y.z]` section in `docs/CHANGELOG.md`; CI publishes the `aweshare` package to npm via Trusted Publishing (OIDC, no token secret) and the Docker image to `ghcr.io/mugpeng/aweshare`.
+
+Layout: `packages/protocol` (shared wire protocol) · `apps/hub` (HTTP+WS+SQLite+CLI) · `apps/agent` (CLI). Design docs live in `docs/specs/`; the changelog in `docs/CHANGELOG.md`; contribution scope in [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## Known limitations (v1)
+
+- No cross-protocol conversion: an alias speaks exactly one wire (openai chat, anthropic messages, or openai responses).
+- Ollama streams carry no usage → token counts recorded as NULL (best effort by design).
+- Single hub instance + SQLite; no horizontal scaling.
+- Corporate proxies may block the WebSocket tunnel (environmental limit).
+
+MIT License.
