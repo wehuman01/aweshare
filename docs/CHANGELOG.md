@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-08-18
+
+### Added
+
+- `aweshare self-update [--check]`: update the npm-installed CLI in place (version check, y/n confirm, `npm install -g aweshare`). A passive update reminder runs at most once per 24h after other commands (cache in `~/.cache/aweshare/`); disable with `AWESHARE_NO_UPDATE_CHECK=1`.
+
+## [0.2.3] - 2026-08-18
+
+### Added
+
+- `scripts/sync-public.mjs` and `.github/workflows/sync-public.yml` to mirror user-facing files (README, LICENSE, docker-compose.yml, docs, logo) to the public repo `wehuman01/aweshare` on every main merge.
+- `sync-public-docs` job in `.github/workflows/release.yml` so the public repo is also refreshed on every release.
+
+### Changed
+
+- Restyled both READMEs with aweskill-style header, badges, and concise description.
+- Fixed Chinese README release section to reflect npm Trusted Publishing (OIDC, no token secret) and the public-repo sync.
+
 ## [0.2.2] - 2026-08-18
 
 ### Changed
