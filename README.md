@@ -16,7 +16,7 @@
   <p>
     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.6-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
-    <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-22C55E?style=flat-square" alt="License"></a>
+    <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
   </p>
   <p>
@@ -62,7 +62,7 @@ Consumer (standard SDK, zero changes)         Producer side
 - aweshare is relay software: it cannot and does not judge whether you are allowed to share a given upstream key or subscription — that question is between you and the upstream provider. Being able to call an API yourself does not mean you may resell or re-provide it to third parties.
 - Before sharing anything, read the upstream's terms (account rules, subscription and seat limits, forwarding, commercial-use clauses). Sharing a personal-subscription key — coding plans included — with third parties likely violates those terms; self-hosted open models have no such issue. **When in doubt, don't share.**
 - The producer bears the consequences of sharing (key revocation, account suspension or termination by the upstream). The hub operator is responsible for operating the hub lawfully and for informing consumers of the plaintext-transit boundary above.
-- The software is provided "as is" under the [MIT license](./LICENSE), without warranty of any kind. The authors and contributors are not liable for how aweshare is used or for any damage arising from sharing access through it.
+- The software is provided "as is" under the [proprietary license](./LICENSE) — free to use and self-host, no redistribution — without warranty of any kind. The authors and contributors are not liable for how aweshare is used or for any damage arising from sharing access through it.
 
 ## Quickstart
 
@@ -266,4 +266,5 @@ Layout: `packages/protocol` (shared wire protocol) · `apps/hub` (HTTP+WS+SQLite
 - Single hub instance + SQLite; no horizontal scaling.
 - Corporate proxies may block the WebSocket tunnel (environmental limit).
 
-MIT License.
+Licensed under the aweshare Proprietary License — free to use and self-host,
+no redistribution. See [LICENSE](./LICENSE).

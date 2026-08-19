@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- License switched from MIT to the aweshare Proprietary License: free to use and self-host, no redistribution or re-provisioning. Applies to releases from this point on; previously published MIT versions remain MIT for those who already obtained them.
+
 ## [0.2.6] - 2026-08-19
 
 ### Added
