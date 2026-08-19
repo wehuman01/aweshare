@@ -30,7 +30,7 @@
   </p>
 </div>
 
-Producers run a lightweight agent on their own machine and share local Ollama/vLLM or **authorized** OpenAI/Anthropic backends. Upstream API keys live only on the producer's device and are injected by the local agent at forwarding time. Consumers point a standard OpenAI/Anthropic SDK at the hub and call models by `namespace/alias` — exactly like using any other model vendor.
+> Producers run a lightweight agent on their own machine and share local Ollama/vLLM or **authorized** OpenAI/Anthropic backends. Upstream API keys live only on the producer's device and are injected by the local agent at forwarding time. Consumers point a standard OpenAI/Anthropic SDK at the hub and call models by `namespace/alias` — exactly like using any other model vendor.
 
 ```
 Consumer (standard SDK, zero changes)         Producer side
@@ -238,6 +238,13 @@ Health: agent heartbeats every 15s, silent 45s = dead; backends with 2 consecuti
 
 Updating a npm install: `aweshare self-update` (asks before installing; `--check` only shows versions). The CLI also reminds you at most once a day when a newer npm release exists.
 
+## Known limitations (v1)
+
+- No cross-protocol conversion: an alias speaks exactly one wire (openai chat, anthropic messages, or openai responses).
+- Ollama streams carry no usage → token counts recorded as NULL (best effort by design).
+- Single hub instance + SQLite; no horizontal scaling.
+- Corporate proxies may block the WebSocket tunnel (environmental limit).
+
 ## Development
 
 ```bash
@@ -259,12 +266,19 @@ Releasing: push a `v*` tag with a matching `## [x.y.z]` section in `docs/CHANGEL
 
 Layout: `packages/protocol` (shared wire protocol) · `apps/hub` (HTTP+WS+SQLite+CLI) · `apps/agent` (CLI). Design docs live in `docs/specs/`; the changelog in `docs/CHANGELOG.md`; contribution scope in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-## Known limitations (v1)
+## Support
 
-- No cross-protocol conversion: an alias speaks exactly one wire (openai chat, anthropic messages, or openai responses).
-- Ollama streams carry no usage → token counts recorded as NULL (best effort by design).
-- Single hub instance + SQLite; no horizontal scaling.
-- Corporate proxies may block the WebSocket tunnel (environmental limit).
+If aweshare saves you a subscription or a GPU box, consider supporting it:
+
+- ⭐ Star the repo — it helps others find it.
+- ☕ [Ko-fi](https://ko-fi.com/mugpeng) — buy me a coffee.
+- 💬 WeChat — scan the QR code below.
+
+<p align="center">
+  <img src="assets/images/wechat-pay.jpg" alt="WeChat Pay" width="240">
+</p>
+
+> aweshare is free to use and self-host. Sponsors keep it maintained — thank you.
 
 Licensed under the aweshare Proprietary License — free to use and self-host,
 no redistribution. See [LICENSE](./LICENSE).
