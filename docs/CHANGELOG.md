@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-08-19
+
+### Added
+
+- `aweshare agent config` subcommands: `path`, `show` (secrets redacted), `edit` (`$VISUAL`/`$EDITOR`/`vi`), and `init` (no-op if files exist).
+- `redactConfig` helper to safely print config without producer token or upstream secrets.
+- `resources/skills/aweshare/SKILL.md` skill for agent/hub configuration and grant workflows.
+
 ## [0.2.5] - 2026-08-18
 
 ### Fixed
