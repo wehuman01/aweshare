@@ -3,11 +3,20 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
-## [Unreleased]
+## [0.2.7] - 2026-08-20
 
 ### Changed
 
 - License switched from MIT to the aweshare Proprietary License: free to use and self-host, no redistribution or re-provisioning. Applies to releases from this point on; previously published MIT versions remain MIT for those who already obtained them.
+- README / README_cn: added Support section (Ko-fi, WeChat Pay QR), reorganized Known limitations placement, and updated the license badge to proprietary.
+- `scripts/sync-public.mjs` now mirrors all non-source files to the public docs repo (previously a hardcoded allowlist); the sync workflow no longer commits and pushes inline.
+
+### Added
+
+- `.github/FUNDING.yml` (Ko-fi sponsor link)
+- `assets/images/wechat-pay.jpg`
+- `resources/README.md` explaining the `resources/` directory shipped with the public docs repo.
+- `resources/skills/aweshare/SKILL.md` expanded with Hub Deployment (npm and Docker), TLS guidance, and remote hub administration notes.
 
 ## [0.2.6] - 2026-08-19
 
