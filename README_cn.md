@@ -83,7 +83,7 @@ aweshare hub serve       # 监听 :8787（前面套 Caddy/nginx 做 TLS）
 ```bash
 docker run -d --name aweshare-hub --restart unless-stopped \
   -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/wehuman01/aweshare:latest
-docker exec aweshare-hub node apps/hub/dist/cli.js init   # 首次：生成 admin token，抄下来
+docker exec aweshare-hub aweshare hub init   # 首次：生成 admin token，抄下来
 ```
 
 然后签发令牌：

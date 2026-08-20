@@ -83,7 +83,7 @@ aweshare hub serve       # listens on :8787 (put Caddy/nginx TLS in front)
 ```bash
 docker run -d --name aweshare-hub --restart unless-stopped \
   -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/wehuman01/aweshare:latest
-docker exec aweshare-hub node apps/hub/dist/cli.js init   # first run: prints the admin token, save it
+docker exec aweshare-hub aweshare hub init   # first run: prints the admin token, save it
 ```
 
 Then issue tokens (admin token in hand):
