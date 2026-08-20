@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-    <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.7-7C3AED?style=flat-square" alt="Version"></a>
+    <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.8-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -92,6 +92,14 @@ docker exec aweshare-hub aweshare hub init   # 首次：生成 admin token，抄
 aweshare hub token issue --role producer --name peng     # → asp_...，给生产者
 aweshare hub token issue --role consumer --name alice    # → asc_...，给消费者
 ```
+
+三种 token 角色，对应三方：
+
+| 角色 | 谁持有 | 怎么用 |
+|---|---|---|
+| `admin` | Hub 操作者（只有你） | 管理命令：`hub token issue` / `grant add` / `token revoke` / `usage` |
+| `producer`（`asp_...`） | 生产者机器上的 agent | 写进 `~/.aweshare/config.toml` 的 `token` 字段，agent 靠它向 hub 注册 offering |
+| `consumer`（`asc_...`） | 调用模型的一方 | 填在 SDK 环境变量（`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`）里，hub 靠它判断能调哪些别名 |
 
 `name` 即生产者的别名命名空间（`peng/gpt-4o` 的 `peng/`）。
 
@@ -238,6 +246,13 @@ aweshare hub consumer limits --name alice --clear    # 清空，回到全局默�
 
 升级 npm 安装：`aweshare self-update`（安装前会确认；`--check` 只看版本不改动）。npm 上有新版本时，CLI 每天最多提醒一次。
 
+## 已知限制（v1）
+
+- 不做跨协议转换：一个别名只讲一种线协议（openai chat、anthropic messages 或 openai responses）。
+- Ollama 流式响应不带 usage → token 数记 NULL（尽力而为）。
+- 单 Hub 单实例 + SQLite，无水平扩展。
+- 企业代理可能拦截 WebSocket 隧道（环境限制）。
+
 ## 开发
 
 ```bash
@@ -259,11 +274,18 @@ aweshare agent doctor
 
 结构：`packages/protocol`（线协议共享包）· `apps/hub`（HTTP+WS+SQLite+CLI）· `apps/agent`（CLI）。设计文档在 `docs/specs/`，变更记录在 `docs/CHANGELOG.md`，贡献范围见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
-## 已知限制（v1）
+## 支持我们
 
-- 不做跨协议转换：一个别名只讲一种线协议（openai chat、anthropic messages 或 openai responses）。
-- Ollama 流式响应不带 usage → token 数记 NULL（尽力而为）。
-- 单 Hub 单实例 + SQLite，无水平扩展。
-- 企业代理可能拦截 WebSocket 隧道（环境限制）。
+如果 aweshare 帮你省下了一份订阅或一台 GPU 机器，欢迎支持它：
+
+- ⭐ 给仓库点个 Star——让更多人看到它。
+- ☕ [Ko-fi](https://ko-fi.com/mugpeng)——请我喝杯咖啡。
+- 💬 微信——扫下方二维码。
+
+<p align="center">
+  <img src="assets/images/wechat-pay.jpg" alt="WeChat Pay" width="240">
+</p>
+
+> aweshare 可免费使用与自托管。赞助让它得以持续维护——谢谢。
 
 依据 aweshare 专有许可发布——可自由使用与自托管，禁止再分发。详见 [LICENSE](./LICENSE)。

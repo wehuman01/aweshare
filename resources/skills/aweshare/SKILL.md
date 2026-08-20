@@ -71,7 +71,7 @@ aweshare hub serve             # user runs this in their own terminal / systemd
 ```bash
 docker run -d --name aweshare-hub --restart unless-stopped \
   -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/wehuman01/aweshare:latest
-docker exec aweshare-hub node apps/hub/dist/cli.js init   # first run: prints the admin token ONCE — save it
+docker exec aweshare-hub aweshare hub init   # first run: prints the admin token ONCE — save it
 ```
 
 The repo also ships a `docker-compose.yml` (port, volume, limit-tuning env vars). The image sets `AWESHARE_HUB_DATA_DIR=/data`, so everything persistent lives in the mounted volume.
@@ -82,7 +82,7 @@ The repo also ships a `docker-compose.yml` (port, volume, limit-tuning env vars)
 
 Hub admin commands (`token issue/list/revoke`, `grant add/remove/list`, `consumer limits`, `usage`) read the admin token file `<AWESHARE_HUB_DATA_DIR>/admin-token` and call the admin API at `AWESHARE_HUB_URL` (default `http://127.0.0.1:8787`). When the hub runs on a server:
 
-- run the commands on the server (`ssh` + CLI, or `docker exec aweshare-hub node apps/hub/dist/cli.js token issue ...`), or
+- run the commands on the server (`ssh` + CLI, or `docker exec aweshare-hub aweshare hub token issue ...`), or
 - run them locally with `AWESHARE_HUB_URL=https://<hub-host>` and the admin-token file placed in a local `AWESHARE_HUB_DATA_DIR`.
 
 Running them from the user's laptop without both will fail ("no admin token at ..." or connection refused) — check this before treating it as a hub malfunction.

@@ -3,6 +3,13 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.2.8] - 2026-08-20
+
+### Changed
+
+- Docker image now ships an `aweshare` wrapper on PATH: `docker exec aweshare-hub aweshare hub token list` works like the npm install, replacing `docker exec aweshare-hub node apps/hub/dist/cli.js ...`; `agent` subcommands fail with a readable error (the agent runs on producer machines).
+- README / README_cn: docker quickstart uses the new `aweshare hub init` exec form; added a three-token-roles table (admin / producer / consumer); README_cn aligned with README (Support section, section order).
+
 ## [0.2.7] - 2026-08-20
 
 ### Changed
