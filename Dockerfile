@@ -25,6 +25,11 @@ COPY --from=build /app/packages/protocol/dist ./packages/protocol/dist
 COPY --from=build /app/apps/hub/node_modules ./apps/hub/node_modules
 COPY --from=build /app/apps/hub/dist ./apps/hub/dist
 COPY --from=build /app/apps/hub/package.json ./apps/hub/
+# container-local `aweshare` command: the image ships the hub only, so the
+# umbrella CLI is a thin wrapper that forwards to the hub CLI. `aweshare hub X`
+# and plain `X` both work; `agent` is rejected (it runs on producer machines).
+RUN printf '#!/bin/sh\n[ "$1" = "hub" ] && shift\n[ "$1" = "agent" ] && { echo "error: the agent runs on the producer machine, not in the hub container" >&2; exit 1; }\nexec node /app/apps/hub/dist/cli.js "$@"\n' > /usr/local/bin/aweshare \
+  && chmod +x /usr/local/bin/aweshare
 EXPOSE 8787
 VOLUME /data
 ENTRYPOINT ["node", "apps/hub/dist/cli.js"]

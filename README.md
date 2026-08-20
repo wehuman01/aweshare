@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-    <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.7-7C3AED?style=flat-square" alt="Version"></a>
+    <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.8-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -83,7 +83,7 @@ aweshare hub serve       # listens on :8787 (put Caddy/nginx TLS in front)
 ```bash
 docker run -d --name aweshare-hub --restart unless-stopped \
   -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/wehuman01/aweshare:latest
-docker exec aweshare-hub node apps/hub/dist/cli.js init   # first run: prints the admin token, save it
+docker exec aweshare-hub aweshare hub init   # first run: prints the admin token, save it
 ```
 
 Then issue tokens (admin token in hand):
@@ -92,6 +92,14 @@ Then issue tokens (admin token in hand):
 aweshare hub token issue --role producer --name peng     # → asp_..., give to the producer
 aweshare hub token issue --role consumer --name alice    # → asc_..., give to the consumer
 ```
+
+Three token roles, one per party:
+
+| Role | Who holds it | How it's used |
+|---|---|---|
+| `admin` | hub operator (you only) | management commands: `hub token issue` / `grant add` / `token revoke` / `usage` |
+| `producer` (`asp_...`) | the agent on the producer's machine | set as `token` in `~/.aweshare/config.toml`; the agent registers its offerings with it |
+| `consumer` (`asc_...`) | whoever calls the models | set in SDK env vars (`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`); the hub uses it to decide which aliases they may call |
 
 The producer's `name` becomes their alias namespace (the `peng/` in `peng/gpt-4o`).
 
