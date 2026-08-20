@@ -9,7 +9,7 @@ This skill covers **configuring** the aweshare agent and hub, and applying grant
 
 ## Do Not Launch
 
-**Never run `aweshare agent start` or `aweshare hub serve` inside this agent.** Both are long-running foreground processes that would block the session. If the user wants to run them, tell them to run it in their own terminal (or as a service/systemd/daemon).
+**Never run `aweshare agent start` or `aweshare hub serve` inside this agent.** Both are long-running foreground processes that would block the session. The same applies to starting the hub as a container (`docker run` / `docker compose up` of `ghcr.io/wehuman01/aweshare`) — deploying a service is the user's call. If the user wants to run them, give them the commands (see Hub Deployment) or tell them to run it in their own terminal (or as a service/systemd/daemon).
 
 You may run these read-only commands:
 - `aweshare agent config path`
@@ -41,7 +41,7 @@ You may also run these commands (they modify files/state but are non-interactive
 | "Let NAME use my model" | Grant | `aweshare agent grant --alias ns/model --consumer NAME` |
 | "Stop NAME from using my model" | Revoke | `aweshare agent revoke --alias ns/model --consumer NAME` |
 | "Who can use what?" | Browse | `aweshare agent list` |
-| "Set up a hub" | Hub setup | `aweshare hub init` (tell user to run `hub serve` themselves) |
+| "Set up a hub" | Hub setup | npm or Docker — see Hub Deployment; `init` prints the admin token once; user runs `serve`/container themselves |
 | "Issue a producer/consumer token" | Hub admin | `aweshare hub token issue --role R --name NAME` |
 | "Rate-limit a consumer" | Hub admin | `aweshare hub consumer limits --name NAME --rps N ...` |
 | "How much was used?" | Metering | `aweshare hub usage` |
@@ -53,6 +53,47 @@ Agent: `~/.aweshare/` — `config.toml` + `secrets.json` (override with `AWESHAR
 Hub: `~/.aweshare-hub/` (override with `AWESHARE_HUB_DATA_DIR`).
 
 Always read the config before modifying it. Run `aweshare agent config show` first — secrets are redacted in its output, so read `config.toml` directly only when you need the structure, never print `secrets.json` values.
+
+## Hub Deployment (npm or Docker)
+
+Both paths are first-class. Docker is the better default on a VPS (restart policy survives reboots, no Node on the host, data isolated in a volume); npm is fine for local or quick setups. In both cases the user runs the server themselves (see Do Not Launch).
+
+**npm:**
+
+```bash
+npm install -g aweshare        # Node ≥ 22
+aweshare hub init              # data in ~/.aweshare-hub; prints the admin token ONCE — save it
+aweshare hub serve             # user runs this in their own terminal / systemd
+```
+
+**Docker** (image is hub-only; the agent always runs on producer machines):
+
+```bash
+docker run -d --name aweshare-hub --restart unless-stopped \
+  -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/wehuman01/aweshare:latest
+docker exec aweshare-hub node apps/hub/dist/cli.js init   # first run: prints the admin token ONCE — save it
+```
+
+The repo also ships a `docker-compose.yml` (port, volume, limit-tuning env vars). The image sets `AWESHARE_HUB_DATA_DIR=/data`, so everything persistent lives in the mounted volume.
+
+**TLS:** consumers dial `https://<hub-host>`, so on a public VPS keep 8787 off the public interface (docker: publish `-p 127.0.0.1:8787:8787`; npm: `--host 127.0.0.1` plus a firewall) and terminate TLS with Caddy/nginx in front. Never expose plaintext :8787 to the internet — consumer tokens and all traffic would cross it unencrypted.
+
+### Administering a remote hub
+
+Hub admin commands (`token issue/list/revoke`, `grant add/remove/list`, `consumer limits`, `usage`) read the admin token file `<AWESHARE_HUB_DATA_DIR>/admin-token` and call the admin API at `AWESHARE_HUB_URL` (default `http://127.0.0.1:8787`). When the hub runs on a server:
+
+- run the commands on the server (`ssh` + CLI, or `docker exec aweshare-hub node apps/hub/dist/cli.js token issue ...`), or
+- run them locally with `AWESHARE_HUB_URL=https://<hub-host>` and the admin-token file placed in a local `AWESHARE_HUB_DATA_DIR`.
+
+Running them from the user's laptop without both will fail ("no admin token at ..." or connection refused) — check this before treating it as a hub malfunction.
+
+### Hub env vars
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` (image: `/data`) | SQLite, pepper, admin token — volume-mount it |
+| `AWESHARE_HUB_HOST` · `AWESHARE_HUB_PORT` | `0.0.0.0` · `8787` | listen address for `serve` |
+| `AWESHARE_CONSUMER_RPS` · `AWESHARE_CONSUMER_BURST` · `AWESHARE_CONSUMER_CONCURRENCY` | `10` · `20` · `8` | hub-wide per-consumer defaults |
 
 ## Agent Config Structure (config.toml)
 
@@ -132,7 +173,7 @@ export ANTHROPIC_AUTH_TOKEN="<consumer token from hub operator>"
 # model: namespace/alias, e.g. peng/gpt-4o
 
 # OpenAI SDK / Codex
-export OPENAI_BASE_URL="https://<hub-host>/openai"
+export OPENAI_BASE_URL="https://<hub-host>/v1"
 export OPENAI_API_KEY="<consumer token>"
 ```
 
@@ -150,4 +191,4 @@ Before sharing a backend, warn the user: relaying a personal-subscription API ke
 4. Offering aliases must be `namespace/name` (lowercase) with the namespace matching the producer token's name; names are globally unique on the hub.
 5. Use `aweshare agent doctor` after any config change; fix the first FAIL, then re-run.
 6. `aweshare agent config init` (like `agent init`) is a no-op if files already exist — it will not clobber.
-7. Hub admin commands need the admin token from `aweshare hub init` output; it is printed only once.
+7. Hub admin commands need the admin token from `aweshare hub init` output; it is printed only once. They read `<AWESHARE_HUB_DATA_DIR>/admin-token` and dial `AWESHARE_HUB_URL` (default `http://127.0.0.1:8787`) — for a remote hub see Hub Deployment.
