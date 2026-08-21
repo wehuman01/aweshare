@@ -26,7 +26,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - `resources/skills/aweshare/SKILL.md` adds a Self-Update section and Docker deployment hints (`docker pull`, `docker ps`).
 - `scripts/sync-public.mjs` excludes `docs/specs` from public sync.
 
-## [Unreleased]
+## [0.3.2] - 2026-08-21
+
+### Added
+
+- Shared table module (`apps/hub/src/table.ts`, `apps/agent/src/table.ts`) with aligned-column rendering, timestamp formatting, and byte-size humanization.
+- Hub `token list`, `invite list`, `grant list`, and `usage` now render aligned tables by default (`--json` keeps the raw API response).
+- Agent `list` now renders grants as an aligned table (`--json` keeps the raw API response).
+- `docker/aweshare-wrapper.sh`: container-local `aweshare` command that forwards to the hub CLI and rejects `agent` with a clear error.
+- `resources/skills/aweshare/SKILL.md` expanded with Producer Admission via Invite Codes, Operations env vars, and `responses` protocol config examples.
+
+### Changed
+
+- Hub and agent CLI help restructured into categorized sections (Setup/Onboarding, Tokens, Invites, Grants, Limits & usage, Run, Config).
+- Agent protocol validation error now names all three supported protocols: `openai`, `anthropic`, `responses`.
+- Umbrella CLI (`bin/aweshare.mjs`) command descriptions updated to reflect `invite`, `join`, and `config` additions.
+- README / README_cn: note that list/usage commands print tables by default; `--json` returns the raw API response.
+- `apps/hub/test/table.test.ts` and `apps/agent/test/table.test.ts` added with full coverage for `formatTable`, `fmtTime`, `renderTokens`, `renderInvites`, `renderGrants`, and `renderUsage`.
 
 ## [0.2.8] - 2026-08-20
 

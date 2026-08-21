@@ -17,6 +17,7 @@ You may run these read-only commands:
 - `aweshare agent doctor`
 - `aweshare agent list`
 - `aweshare hub token list`
+- `aweshare hub invite list`
 - `aweshare hub grant list`
 - `aweshare hub usage [--alias ALIAS]`
 - `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
@@ -27,7 +28,9 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare agent grant --alias ALIAS --consumer NAME [--expires-in 7d|12h|30m|90s]`
 - `aweshare agent revoke --alias ALIAS --consumer NAME`
 - `aweshare hub init`, `aweshare hub token issue`, `aweshare hub token revoke`
-- `aweshare hub grant add|remove`, `aweshare hub consumer limits`
+- `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]`, `aweshare hub invite revoke --id N` — one-time producer invite codes (`asi_…`, shown once)
+- `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
+- `aweshare hub grant add|remove`, `aweshare hub consumer limits` (flags: `--rps` `--burst` `--concurrency` `--tpm` `--max-total-tokens` `--clear`)
 
 ## Intent Router
 
@@ -44,8 +47,9 @@ You may also run these commands (they modify files/state but are non-interactive
 | "Who can use what?" | Browse | `aweshare agent list` |
 | "Set up a hub" | Hub setup | npm or Docker — see Hub Deployment; `init` prints the admin token once; user runs `serve`/container themselves |
 | "Issue a producer/consumer token" | Hub admin | `aweshare hub token issue --role R --name NAME` |
-| "Rate-limit a consumer" | Hub admin | `aweshare hub consumer limits --name NAME --rps N ...` |
+| "Rate-limit or cap a consumer" | Hub admin | `aweshare hub consumer limits --name NAME --rps N --tpm N --max-total-tokens N ...` |
 | "How much was used?" | Metering | `aweshare hub usage` |
+| "Invite producers without hand-delivering tokens" | Invite codes | `aweshare hub invite create --name NAME` (bound) or `--count N` (unbound); producer redeems via `aweshare agent join` — see Producer Admission |
 | "Point Claude Code / an SDK at the hub" | Consumer | Explain env vars (see Consumer Setup) |
 | "Update aweshare itself", "upgrade the CLI/hub" | Self-Update | `aweshare self-update --check` first, then see Self-Update (npm vs Docker differ) |
 
@@ -98,6 +102,25 @@ Running them from the user's laptop without both will fail ("no admin token at .
 | `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` (image: `/data`) | SQLite, pepper, admin token — volume-mount it |
 | `AWESHARE_HUB_HOST` · `AWESHARE_HUB_PORT` | `0.0.0.0` · `8787` | listen address for `serve` |
 | `AWESHARE_CONSUMER_RPS` · `AWESHARE_CONSUMER_BURST` · `AWESHARE_CONSUMER_CONCURRENCY` | `10` · `20` · `8` | hub-wide per-consumer defaults |
+| `AWESHARE_HEAD_TIMEOUT_MS` · `AWESHARE_IDLE_TIMEOUT_MS` | `120000` · `300000` | response-head timeout / stream idle timeout |
+| `AWESHARE_MAX_BODY_BYTES` | `32MB` | request body cap |
+| `AWESHARE_INVITE_REDEEM_PER_MIN` | `10` | rate limit for the unauthenticated invite-redeem endpoint |
+
+## Producer Admission via Invite Codes
+
+Besides the admin issuing a producer token (`hub token issue --role producer`) and handing over the secret, producers can self-service:
+
+```bash
+# bound: locked to one producer name
+aweshare hub invite create --name peng [--expires-in 7d]      # → asi_..., send to the producer
+# unbound: batch hand-out; producer submits name + email at redeem
+aweshare hub invite create --count 10 [--expires-in 7d]
+
+# producer side — redeems the code, writes the token into their config:
+aweshare agent join --hub https://<hub-host> --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
+```
+
+Codes are single-use, optionally expiring, revocable until redeemed (`hub invite list` / `hub invite revoke --id N`). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, grant).
 
 ## Agent Config Structure (config.toml)
 
@@ -107,9 +130,15 @@ token = "asp_..."                        # producer token from the hub operator
 
 [[backends]]
 id = "ollama"                            # local name referenced by offerings
-protocol = "openai"                      # openai | anthropic
-baseUrl = "http://127.0.0.1:11434/v1"    # openai-style includes /v1; anthropic-style excludes it
+protocol = "openai"                      # openai | anthropic | responses
+baseUrl = "http://127.0.0.1:11434/v1"    # openai-style includes /v1
 # keyRef = "openai-key"                  # optional; value lives in secrets.json
+
+[[backends]]
+id = "glm"
+protocol = "responses"                   # responses-style baseUrl includes the version path
+baseUrl = "https://open.bigmodel.cn/api/v1"
+keyRef = "glm-key"
 
 [[offerings]]
 alias = "YOUR_NAME/qwen2.5.7b"           # namespace/name, lowercase, globally unique
@@ -127,7 +156,8 @@ secrets.json maps `keyRef` names to upstream API keys:
 **Rules:**
 - The namespace in every alias must match the producer name the token was issued for.
 - Upstream keys live only in secrets.json on the producer's machine — never in config.toml, never in chat output.
-- `anthropic`-protocol baseUrl excludes `/v1` (the agent appends it); `openai`-protocol baseUrl includes `/v1`.
+- `anthropic`-protocol baseUrl excludes `/v1` (the agent appends it); `openai`-protocol baseUrl includes `/v1`; `responses`-protocol baseUrl includes the version path (e.g. `https://open.bigmodel.cn/api/v1`).
+- An alias speaks exactly one wire protocol — there is no cross-protocol conversion.
 - `upstreamModel` must match the backend exactly (e.g. `ollama list` tag).
 
 ## Workflows
