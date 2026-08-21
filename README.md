@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.2-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.3-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -55,7 +55,7 @@ Consumer (standard SDK, zero changes)         Producer side
 ## Trust boundary (read this first)
 
 - To route and meter, **consumer prompts and model responses transit the hub in plaintext — this is not end-to-end encryption**. The hub persists no request/response content, but the hub operator can technically see it. Only use a hub instance you trust — which is why the hub is open source and self-hostable.
-- Upstream API keys never leave the producer's device and are never sent to consumers; the hub database stores only SHA-256 hashes of tokens.
+- Upstream API keys never leave the producer's device and are never sent to consumers; the hub authenticates tokens by SHA-256 hash. Since v4 the hub also stores the plaintext of tokens and invite codes it issues (NULL for older rows) so admins can re-display them with `hub token list --reveal` / `hub invite list --reveal` — treat the hub database as secret-bearing: a DB leak exposes every secret issued since v4.
 
 ### Compliance and disclaimer
 
@@ -255,9 +255,9 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub init` | create data dir + admin token (printed once) |
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
 | `aweshare hub token issue --role producer\|consumer --name NAME` | issue a producer (`asp_…`) or consumer (`asc_…`) token |
-| `aweshare hub token list` · `aweshare hub token revoke --role R --id N` | list / revoke tokens |
-| `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]` | create one-time invite codes (`asi_…`, shown once); with `--name` bound to that producer, without it the producer submits name + email at redeem |
-| `aweshare hub invite list` · `aweshare hub invite revoke --id N` | list / revoke (unredeemed) invites |
+| `aweshare hub token list [--reveal]` · `aweshare hub token revoke --role R --id N` | list / revoke tokens (`--reveal` also shows the stored plaintext of tokens issued since v4) |
+| `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]` | create one-time invite codes (`asi_…`, printed once; re-view with `invite list --reveal`); with `--name` bound to that producer, without it the producer submits name + email at redeem |
+| `aweshare hub invite list [--reveal]` · `aweshare hub invite revoke --id N` | list / revoke (unredeemed) invites (`--reveal` re-shows codes created since v4) |
 | `aweshare hub grant add --alias ns/model --consumer NAME [--expires-in 7d]` | grant (or refresh) access to an alias |
 | `aweshare hub grant list` · `aweshare hub grant remove --alias A --consumer NAME` | list / remove grants |
 | `aweshare hub consumer limits --name NAME [--rps N] [--burst N] [--concurrency N] [--tpm N] [--max-total-tokens N] [--clear]` | per-consumer overrides (see Consumer limits) |

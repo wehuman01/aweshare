@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.2-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.3-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -55,7 +55,7 @@
 ## 信任边界（先读这个）
 
 - 为完成路由与计量，**消费者的提示词与模型响应都会经过 Hub，不是端到端加密**。Hub 不持久化任何请求/响应内容，但 Hub 运维者技术上可见明文——请只使用你信得过的 Hub 实例（这也是 Hub 开源 + 自建部署的意义）。
-- 上游 API Key 永不离开生产者设备，也不会发给消费者；Hub 数据库里只存各类令牌的 SHA-256 哈希。
+- 上游 API Key 永不离开生产者设备，也不会发给消费者；Hub 认证令牌用的是 SHA-256 哈希。自 v4 起，新签发的令牌与邀请码会同时保存一份明文（旧记录为空），供管理员用 `hub token list --reveal` / `hub invite list --reveal` 重新查看——因此请把 Hub 数据库当作含密数据对待：数据库泄露即暴露 v4 之后签发的全部密钥。
 
 ### 合规与免责
 
@@ -255,9 +255,9 @@ aweshare hub consumer limits --name alice --clear    # 清空，回到全局默�
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
 | `aweshare hub token issue --role producer\|consumer --name NAME` | 签发 producer（`asp_…`）或 consumer（`asc_…`）令牌 |
-| `aweshare hub token list` · `aweshare hub token revoke --role R --id N` | 列出 / 吊销令牌 |
-| `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]` | 创建一次性邀请码（`asi_…`，只显示一次）；带 `--name` 绑定该生产者，不带则由生产者兑换时提交 name + email |
-| `aweshare hub invite list` · `aweshare hub invite revoke --id N` | 列出 / 撤销（未兑换的）邀请码 |
+| `aweshare hub token list [--reveal]` · `aweshare hub token revoke --role R --id N` | 列出 / 吊销令牌（`--reveal` 附带显示 v4 之后签发令牌的明文） |
+| `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]` | 创建一次性邀请码（`asi_…`，只打印一次；可用 `invite list --reveal` 重新查看）；带 `--name` 绑定该生产者，不带则由生产者兑换时提交 name + email |
+| `aweshare hub invite list [--reveal]` · `aweshare hub invite revoke --id N` | 列出 / 撤销（未兑换的）邀请码（`--reveal` 可重新显示 v4 之后创建的邀请码） |
 | `aweshare hub grant add --alias ns/model --consumer NAME [--expires-in 7d]` | 授予（或刷新）别名访问权 |
 | `aweshare hub grant list` · `aweshare hub grant remove --alias A --consumer NAME` | 列出 / 移除授权 |
 | `aweshare hub consumer limits --name NAME [--rps N] [--burst N] [--concurrency N] [--tpm N] [--max-total-tokens N] [--clear]` | 按消费者限额覆盖（见「消费者限制」） |

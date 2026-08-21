@@ -3,6 +3,16 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.3] - 2026-08-22
+
+### Added
+
+- `hub token list --reveal` and `hub invite list --reveal` (API: `?reveal=true` on the two admin list endpoints) re-display the stored plaintext of tokens / invite codes. Secrets issued from this version on are stored in the database alongside their hash (new `token_plain` / `code_plain` columns, schema v4, auto-migrated); pre-v4 rows show `-` since hashes are not reversible. Trade-off made explicit in the README trust section: a DB leak now exposes every secret issued since this version. Producer tokens minted at invite redeem are stored the same way.
+
+### Changed
+
+- README / README_cn / `resources/skills/aweshare/SKILL.md`: command reference and trust-boundary wording updated for `--reveal`; invite code descriptions now note re-viewability via `hub invite list --reveal`.
+
 ## [0.3.1] - 2026-08-21
 
 ### Changed

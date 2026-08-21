@@ -16,8 +16,8 @@ You may run these read-only commands:
 - `aweshare agent config show` (secrets redacted)
 - `aweshare agent doctor`
 - `aweshare agent list`
-- `aweshare hub token list`
-- `aweshare hub invite list`
+- `aweshare hub token list` (`--reveal` shows stored plaintext for tokens issued since plaintext storage landed; rows from before show `-`)
+- `aweshare hub invite list` (`--reveal` re-shows codes created since plaintext storage landed)
 - `aweshare hub grant list`
 - `aweshare hub usage [--alias ALIAS]`
 - `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
@@ -28,7 +28,7 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare agent grant --alias ALIAS --consumer NAME [--expires-in 7d|12h|30m|90s]`
 - `aweshare agent revoke --alias ALIAS --consumer NAME`
 - `aweshare hub init`, `aweshare hub token issue`, `aweshare hub token revoke`
-- `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]`, `aweshare hub invite revoke --id N` — one-time producer invite codes (`asi_…`, shown once)
+- `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]`, `aweshare hub invite revoke --id N` — one-time producer invite codes (`asi_…`, printed once; re-view with `invite list --reveal`)
 - `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
 - `aweshare hub grant add|remove`, `aweshare hub consumer limits` (flags: `--rps` `--burst` `--concurrency` `--tpm` `--max-total-tokens` `--clear`)
 
@@ -120,7 +120,7 @@ aweshare hub invite create --count 10 [--expires-in 7d]
 aweshare agent join --hub https://<hub-host> --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
-Codes are single-use, optionally expiring, revocable until redeemed (`hub invite list` / `hub invite revoke --id N`). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, grant).
+Codes are single-use, optionally expiring, revocable until redeemed (`hub invite list` / `hub invite revoke --id N`). `hub invite list --reveal` re-shows codes created since plaintext storage landed (older ones are hash-only and unrecoverable — revoke and re-create). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, grant).
 
 ## Agent Config Structure (config.toml)
 
