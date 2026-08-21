@@ -3,6 +3,15 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.1] - 2026-08-21
+
+### Changed
+
+- `apps/hub/package.json` version synced to match the root package version.
+- Docker hub wrapper now handles `-h/--help/help`, `-v/--version` and empty args by delegating to the hub CLI directly.
+- Self-update reminder hardened: numeric version comparison (`versionGte`), 6-hour backoff after failed npm lookup, legacy caches written by older aweshare versions are treated as stale.
+- `.github/FUNDING.yml` normalized to the current `ko_fi` key format.
+
 ## [0.3.0] - 2026-08-21
 
 ### Added
