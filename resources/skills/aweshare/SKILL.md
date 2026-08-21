@@ -19,6 +19,7 @@ You may run these read-only commands:
 - `aweshare hub token list`
 - `aweshare hub grant list`
 - `aweshare hub usage [--alias ALIAS]`
+- `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
 
 You may also run these commands (they modify files/state but are non-interactive):
 - `aweshare agent config init` — write config template + empty secrets (no-op if they exist)
@@ -46,6 +47,7 @@ You may also run these commands (they modify files/state but are non-interactive
 | "Rate-limit a consumer" | Hub admin | `aweshare hub consumer limits --name NAME --rps N ...` |
 | "How much was used?" | Metering | `aweshare hub usage` |
 | "Point Claude Code / an SDK at the hub" | Consumer | Explain env vars (see Consumer Setup) |
+| "Update aweshare itself", "upgrade the CLI/hub" | Self-Update | `aweshare self-update --check` first, then see Self-Update (npm vs Docker differ) |
 
 ## Config Location
 
@@ -69,9 +71,11 @@ aweshare hub serve             # user runs this in their own terminal / systemd
 **Docker** (image is hub-only; the agent always runs on producer machines):
 
 ```bash
+docker pull ghcr.io/wehuman01/aweshare:latest
 docker run -d --name aweshare-hub --restart unless-stopped \
   -p 127.0.0.1:8787:8787 -v "$PWD/data:/data" ghcr.io/wehuman01/aweshare:latest
 docker exec aweshare-hub aweshare hub init   # first run: prints the admin token ONCE — save it
+docker ps | grep aweshare-hub                # verify container is running
 ```
 
 The repo also ships a `docker-compose.yml` (port, volume, limit-tuning env vars). The image sets `AWESHARE_HUB_DATA_DIR=/data`, so everything persistent lives in the mounted volume.
@@ -178,6 +182,33 @@ export OPENAI_API_KEY="<consumer token>"
 ```
 
 Remind consumers: traffic transits the hub in plaintext — only use a hub they trust.
+
+### Self-Update
+
+Use when the task is about updating the aweshare CLI or a deployed hub, or when the installed CLI behaves differently from the repo/README.
+
+```bash
+# npm installs (producer machines, npm-run hub)
+aweshare self-update --check     # current vs npm latest — read-only, safe to run here
+aweshare self-update             # y/n confirm — needs a real terminal (agent shells have no TTY)
+npm install -g aweshare          # non-interactive equivalent; verify with aweshare -v
+
+# Docker-deployed hub (state persists in the /data volume)
+docker compose pull && docker compose up -d      # with the repo's docker-compose.yml
+docker pull ghcr.io/wehuman01/aweshare:latest    # or plain docker: stop/rm + re-run the Hub Deployment command
+```
+
+Rules of thumb:
+- Update the hub first (it is the public entry point), then producer agents. Agents redial automatically after a hub restart (reverse tunnel, latest-wins); consumers see 503 only during the brief restart window.
+- A running `aweshare agent start` does not hot-reload — restart it after updating the CLI on that machine.
+- The CLI prints a passive update reminder at most once per 24h; disable with `AWESHARE_NO_UPDATE_CHECK=1`.
+
+If the installed `aweshare` doesn't match what the user expects from the repository:
+
+1. `which aweshare` — confirm which binary is active
+2. `aweshare self-update --check` — installed vs npm latest ("unknown target" means the install predates 0.2.4, when self-update landed)
+3. Update via `npm install -g aweshare` (or have the user run `aweshare self-update` in their own terminal), then `aweshare -v`
+4. If the mismatch persists, inspect the global package (`npm ls -g aweshare`) to confirm which code is actually running.
 
 ## Trust and Compliance
 

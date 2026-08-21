@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-    <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.8-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -91,6 +91,19 @@ docker exec aweshare-hub aweshare hub init   # 首次：生成 admin token，抄
 ```bash
 aweshare hub token issue --role producer --name peng     # → asp_...，给生产者
 aweshare hub token issue --role consumer --name alice    # → asc_...，给消费者
+```
+
+生产者还有一条自助通道——邀请码（`asi_…`，一次性）。两种模式：
+
+```bash
+# 绑定：码锁定某个名字（"邀请某个用户"）
+aweshare hub invite create --name peng [--expires-in 7d]      # → asi_...，发给生产者
+
+# 不绑定：批量发放；生产者兑换时自己提交 name + email（写入 hub）
+aweshare hub invite create --count 10 [--expires-in 7d]
+
+# 生产者自行兑换（不需要传递令牌本身）：
+aweshare agent join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
 三种 token 角色，对应三方：
@@ -230,6 +243,40 @@ aweshare hub consumer limits --name alice --clear    # 清空，回到全局默�
 错误语义：`401` 无效密钥 · `403` 未获授权或授权已过期（`GRANT_EXPIRED`） · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`QUOTA_EXCEEDED` = 终身 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
 
 用量记录：每请求一行（别名、真实模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。生产者 `aweshare agent list` 查看授权，`aweshare hub usage` 查询用量。
+
+## 常用命令
+
+两侧命令速查——细节见上文各节。
+
+**Hub（运营者）**——需要 `aweshare hub init` 输出的 admin token；hub 在远端服务器时，在服务器上执行，或设置 `AWESHARE_HUB_URL` 后本地执行：
+
+| 命令 | 用途 |
+|---|---|
+| `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
+| `aweshare hub serve [--host H] [--port N]` | 启动 hub |
+| `aweshare hub token issue --role producer\|consumer --name NAME` | 签发 producer（`asp_…`）或 consumer（`asc_…`）令牌 |
+| `aweshare hub token list` · `aweshare hub token revoke --role R --id N` | 列出 / 吊销令牌 |
+| `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]` | 创建一次性邀请码（`asi_…`，只显示一次）；带 `--name` 绑定该生产者，不带则由生产者兑换时提交 name + email |
+| `aweshare hub invite list` · `aweshare hub invite revoke --id N` | 列出 / 撤销（未兑换的）邀请码 |
+| `aweshare hub grant add --alias ns/model --consumer NAME [--expires-in 7d]` | 授予（或刷新）别名访问权 |
+| `aweshare hub grant list` · `aweshare hub grant remove --alias A --consumer NAME` | 列出 / 移除授权 |
+| `aweshare hub consumer limits --name NAME [--rps N] [--burst N] [--concurrency N] [--tpm N] [--max-total-tokens N] [--clear]` | 按消费者限额覆盖（见「消费者限制」） |
+| `aweshare hub usage [--alias A] [--limit N]` | 用量统计 |
+
+**Agent（生产者侧）**——运行在生产者（即带后端）的那台机器上；消费者不运行任何 aweshare 命令，标准 SDK 直连 hub 即可（见「消费工具配置」）：
+
+| 命令 | 用途 |
+|---|---|
+| `aweshare agent init [--hub URL] [--token asp_…]` | 写入 `~/.aweshare` 配置模板 |
+| `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | 兑换邀请码得到 producer 令牌并写入配置（不绑定码需 `--name`/`--email`） |
+| `aweshare agent config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
+| `aweshare agent doctor` | 预检——修好第一个 FAIL 再重跑 |
+| `aweshare agent grant --alias ns/model --consumer NAME [--expires-in 7d]` | 授权消费者 |
+| `aweshare agent revoke --alias ns/model --consumer NAME` | 取消授权 |
+| `aweshare agent list` | 列出你命名空间下的授权 |
+| `aweshare agent start` | 连接并转发（长驻进程，在自己终端里跑） |
+
+CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 
 ## 运维
 

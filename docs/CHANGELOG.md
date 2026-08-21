@@ -3,6 +3,22 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.0] - 2026-08-21
+
+### Added
+
+- Invite codes (`asi_…`) for producer self-service admission, in two modes. Bound: `aweshare hub invite create --name NAME [--count N] [--expires-in 7d]` locks the code to that producer name. Unbound: omit `--name` to batch hand-out codes; the producer submits `--name` + `--email` at redeem and both are stored on the producer row (visible in `hub token list`; email is self-reported contact info, not verification). Producers run `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` to redeem a producer token and write it into their config — no admin round-trip for the secret itself. Codes are single-use, optionally expiring, revocable until redeemed (`hub invite list` / `hub invite revoke`); a name clash at redeem rolls back and leaves the code usable. `hub token issue` also accepts `--email` for producers. DB schema v3 (auto-migrated); the unauthenticated redeem endpoint is rate-limited (`AWESHARE_INVITE_REDEEM_PER_MIN`, default 10/min).
+
+### Changed
+
+- Docker hub wrapper now routes `aweshare hub <command>` directly and rejects bare invocations with a clearer error message.
+- README / README_cn: added invite flow docs and command reference tables.
+- CLI help output restructured to a standard `Usage` / `Options` / `Commands` layout; adds `-v/--version`.
+- `resources/skills/aweshare/SKILL.md` adds a Self-Update section and Docker deployment hints (`docker pull`, `docker ps`).
+- `scripts/sync-public.mjs` excludes `docs/specs` from public sync.
+
+## [Unreleased]
+
 ## [0.2.8] - 2026-08-20
 
 ### Changed
