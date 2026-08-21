@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-    <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.2.8-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -91,6 +91,19 @@ Then issue tokens (admin token in hand):
 ```bash
 aweshare hub token issue --role producer --name peng     # → asp_..., give to the producer
 aweshare hub token issue --role consumer --name alice    # → asc_..., give to the consumer
+```
+
+For producers there is also a self-service path — invite codes (`asi_…`, single use). Two modes:
+
+```bash
+# bound: lock the code to a specific name ("inviting that user")
+aweshare hub invite create --name peng [--expires-in 7d]      # → asi_..., send to the producer
+
+# unbound: batch hand-out; the producer submits name + email at redeem (stored on the hub)
+aweshare hub invite create --count 10 [--expires-in 7d]
+
+# the producer redeems it themselves (no token hand-off needed):
+aweshare agent join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
 Three token roles, one per party:
@@ -230,6 +243,40 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 Error semantics: `401` invalid key · `403` not granted or `GRANT_EXPIRED` · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`QUOTA_EXCEEDED` = lifetime token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
 
 Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Producers list grants with `aweshare agent list`; query usage with `aweshare hub usage`.
+
+## Command reference
+
+Both sides at a glance — details in the sections above.
+
+**Hub (operator)** — needs the admin token from `aweshare hub init`; for a hub on another server, run these on the server or set `AWESHARE_HUB_URL`:
+
+| Command | Purpose |
+|---|---|
+| `aweshare hub init` | create data dir + admin token (printed once) |
+| `aweshare hub serve [--host H] [--port N]` | run the hub |
+| `aweshare hub token issue --role producer\|consumer --name NAME` | issue a producer (`asp_…`) or consumer (`asc_…`) token |
+| `aweshare hub token list` · `aweshare hub token revoke --role R --id N` | list / revoke tokens |
+| `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]` | create one-time invite codes (`asi_…`, shown once); with `--name` bound to that producer, without it the producer submits name + email at redeem |
+| `aweshare hub invite list` · `aweshare hub invite revoke --id N` | list / revoke (unredeemed) invites |
+| `aweshare hub grant add --alias ns/model --consumer NAME [--expires-in 7d]` | grant (or refresh) access to an alias |
+| `aweshare hub grant list` · `aweshare hub grant remove --alias A --consumer NAME` | list / remove grants |
+| `aweshare hub consumer limits --name NAME [--rps N] [--burst N] [--concurrency N] [--tpm N] [--max-total-tokens N] [--clear]` | per-consumer overrides (see Consumer limits) |
+| `aweshare hub usage [--alias A] [--limit N]` | usage metering |
+
+**Agent (producer)** — runs on the producer's machine (the one with the backends); consumers run no aweshare commands — they point a standard SDK at the hub (see Consumer tool configuration):
+
+| Command | Purpose |
+|---|---|
+| `aweshare agent init [--hub URL] [--token asp_…]` | write config templates into `~/.aweshare` |
+| `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | redeem an invite code into a producer token and write it into the config (`--name`/`--email` for unbound codes) |
+| `aweshare agent config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
+| `aweshare agent doctor` | pre-flight checks — fix the first FAIL, re-run |
+| `aweshare agent grant --alias ns/model --consumer NAME [--expires-in 7d]` | grant a consumer access |
+| `aweshare agent revoke --alias ns/model --consumer NAME` | revoke access |
+| `aweshare agent list` | list grants for your namespace |
+| `aweshare agent start` | connect and relay (long-running; run it in your own terminal) |
+
+CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
 
 ## Operations
 
