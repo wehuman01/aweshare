@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.3-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.4-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -55,7 +55,8 @@
 ## 信任边界（先读这个）
 
 - 为完成路由与计量，**消费者的提示词与模型响应都会经过 Hub，不是端到端加密**。Hub 不持久化任何请求/响应内容，但 Hub 运维者技术上可见明文——请只使用你信得过的 Hub 实例（这也是 Hub 开源 + 自建部署的意义）。
-- 上游 API Key 永不离开生产者设备，也不会发给消费者；Hub 认证令牌用的是 SHA-256 哈希。自 v4 起，新签发的令牌与邀请码会同时保存一份明文（旧记录为空），供管理员用 `hub token list --reveal` / `hub invite list --reveal` 重新查看——因此请把 Hub 数据库当作含密数据对待：数据库泄露即暴露 v4 之后签发的全部密钥。
+- 上游 API Key 永不离开生产者设备，也不会发给消费者。令牌在库内**只存哈希**（加盐 SHA-256）：明文只在签发/兑换时展示一次，之后永远无法重新查看。邀请码是有意的例外——保留明文供运维者用 `hub invite list --reveal` 找回；数据库泄露会暴露未兑换的邀请码，但不会暴露任何令牌。
+- 令牌吊销是**可逆挂起**（`hub token revoke` / `hub token restore`），且邀请码与它换出的生产者同进退：撤销已兑换的码即挂起对应生产者（并断开其隧道），从任一侧 restore 都同时救回两者。吊销不删除任何数据——授权、offerings 与用量记录在挂起期间完整保留。
 
 ### 合规与免责
 
@@ -229,7 +230,7 @@ aweshare hub consumer limits --name alice --clear    # 清空，回到全局默�
 
 授权可带有效期：`aweshare hub grant add --alias peng/gpt-4o --consumer alice --expires-in 7d`（生产者侧用 `aweshare agent grant … --expires-in 7d`）。过期授权返回 `403 GRANT_EXPIRED`；重新授权会刷新到期时间。
 
-诚实的限制说明：token 类上限只统计上游报告的用量——Ollama 流式响应不带 usage，按 0 计。TPM 是尽力而为（所有并发请求都在任何一个完成前通过时可能超限）；终身预算是精确的，因为它对持久化记录求和。
+诚实的限制说明：token 类上限只统计上游报告的用量——Ollama 流式响应不带 usage，按 0 计。TPM 和终身预算都是基于已观测用量的阈值，不是预留式硬上限：单个请求可能跨过阈值，先于已有请求用量落库的并发请求还会进一步超额；已记录用量达到阈值后，新请求才会被拒绝。
 
 ## 端点与错误
 
@@ -240,7 +241,7 @@ aweshare hub consumer limits --name alice --clear    # 清空，回到全局默�
 | `GET /healthz` | 存活探测 |
 | `/admin/v1/*` | 令牌/授权/用量管理（admin 或生产者令牌）· 消费者限制覆盖：`GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`（仅 admin） |
 
-错误语义：`401` 无效密钥 · `403` 未获授权或授权已过期（`GRANT_EXPIRED`） · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`QUOTA_EXCEEDED` = 终身 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
+错误语义：`401` 无效密钥 · `401 TOKEN_REVOKED` 令牌被挂起（请联系运维者 restore） · `403` 未获授权或授权已过期（`GRANT_EXPIRED`） · `403 HUB_FULL` 生产者容量已满 · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`QUOTA_EXCEEDED` = 终身 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
 
 用量记录：每请求一行（别名、真实模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。生产者 `aweshare agent list` 查看授权，`aweshare hub usage` 查询用量。
 
@@ -255,9 +256,9 @@ aweshare hub consumer limits --name alice --clear    # 清空，回到全局默�
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
 | `aweshare hub token issue --role producer\|consumer --name NAME` | 签发 producer（`asp_…`）或 consumer（`asc_…`）令牌 |
-| `aweshare hub token list [--reveal]` · `aweshare hub token revoke --role R --id N` | 列出 / 吊销令牌（`--reveal` 附带显示 v4 之后签发令牌的明文） |
+| `aweshare hub token list` · `aweshare hub token revoke --role R --id N` · `aweshare hub token restore --role R --id N` | 列出（含挂起状态与最近活跃）/ 挂起 / 恢复令牌——令牌只存哈希，签发时务必保存 |
 | `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]` | 创建一次性邀请码（`asi_…`，只打印一次；可用 `invite list --reveal` 重新查看）；带 `--name` 绑定该生产者，不带则由生产者兑换时提交 name + email |
-| `aweshare hub invite list [--reveal]` · `aweshare hub invite revoke --id N` | 列出 / 撤销（未兑换的）邀请码（`--reveal` 可重新显示 v4 之后创建的邀请码） |
+| `aweshare hub invite list [--reveal]` · `aweshare hub invite revoke --id N` · `aweshare hub invite restore --id N` | 列出（状态：pending/used/suspended/revoked/expired）/ 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 可救回 |
 | `aweshare hub grant add --alias ns/model --consumer NAME [--expires-in 7d]` | 授予（或刷新）别名访问权 |
 | `aweshare hub grant list` · `aweshare hub grant remove --alias A --consumer NAME` | 列出 / 移除授权 |
 | `aweshare hub consumer limits --name NAME [--rps N] [--burst N] [--concurrency N] [--tpm N] [--max-total-tokens N] [--clear]` | 按消费者限额覆盖（见「消费者限制」） |
@@ -289,6 +290,8 @@ CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--chec
 | `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | 每消费者限流 |
 | `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 300000 | 响应头超时 / 流空闲超时 |
 | `AWESHARE_MAX_BODY_BYTES` | 32MB | 请求体上限 |
+| `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | 兑换端点（免认证）限流 |
+| `AWESHARE_MAX_PRODUCERS` | 10 | 活跃生产者上限——`token issue`、邀请码兑换与 restore 满员时返回 `403 HUB_FULL` |
 | `AWESHARE_NO_UPDATE_CHECK` | 未设置 | 设为 `1` 关闭被动更新提醒 |
 
 健康：Agent 心跳 15s，静默 45s 判死；后端 AUTH/QUOTA 连败 2 次自动降级（别名对消费者显示 degraded，停止派发），30s 探测恢复。同一生产者令牌新连接替换旧连接（latest-wins）。

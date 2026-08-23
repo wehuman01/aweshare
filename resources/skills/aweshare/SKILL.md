@@ -16,8 +16,8 @@ You may run these read-only commands:
 - `aweshare agent config show` (secrets redacted)
 - `aweshare agent doctor`
 - `aweshare agent list`
-- `aweshare hub token list` (`--reveal` shows stored plaintext for tokens issued since plaintext storage landed; rows from before show `-`)
-- `aweshare hub invite list` (`--reveal` re-shows codes created since plaintext storage landed)
+- `aweshare hub token list` (suspension state + last seen; tokens are hash-only at rest — no --reveal exists, save tokens at issue)
+- `aweshare hub invite list` (`--reveal` re-shows stored invite codes; statuses: pending/used/suspended/revoked/expired)
 - `aweshare hub grant list`
 - `aweshare hub usage [--alias ALIAS]`
 - `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
@@ -27,10 +27,14 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare agent config edit` — open config in `$VISUAL`/`$EDITOR`/`vi`
 - `aweshare agent grant --alias ALIAS --consumer NAME [--expires-in 7d|12h|30m|90s]`
 - `aweshare agent revoke --alias ALIAS --consumer NAME`
-- `aweshare hub init`, `aweshare hub token issue`, `aweshare hub token revoke`
-- `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]`, `aweshare hub invite revoke --id N` — one-time producer invite codes (`asi_…`, printed once; re-view with `invite list --reveal`)
+- `aweshare hub init`, `aweshare hub token issue`, `aweshare hub token revoke`, `aweshare hub token restore --role R --id N`
+- `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]`, `aweshare hub invite revoke --id N`, `aweshare hub invite restore --id N` — one-time producer invite codes (`asi_…`, printed once; re-view with `invite list --reveal`)
 - `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
 - `aweshare hub grant add|remove`, `aweshare hub consumer limits` (flags: `--rps` `--burst` `--concurrency` `--tpm` `--max-total-tokens` `--clear`)
+
+## Suspension semantics (hub)
+
+Token revocation is **reversible suspension**, never deletion: `hub token revoke --role R --id N` sets the suspension flag (closes a producer's tunnel at once); `hub token restore --role R --id N` clears it — the same token works again, and grants/offerings/usage survived. Suspended tokens get `401 TOKEN_REVOKED` (not a bare invalid key). An invite and the producer it minted move together: revoking a redeemed code suspends that producer, and restoring from either handle (`invite restore` or `token restore`) revives both; restoring a producer needs a free slot (`403 HUB_FULL` when `AWESHARE_MAX_PRODUCERS`, default 10, active producers are reached — the cap also gates `token issue --role producer` and invite redeem).
 
 ## Intent Router
 
@@ -43,7 +47,8 @@ You may also run these commands (they modify files/state but are non-interactive
 | "Show my config" | Config Show | `aweshare agent config show` |
 | "Something doesn't work" | Diagnose | `aweshare agent doctor` — fix the first FAIL |
 | "Let NAME use my model" | Grant | `aweshare agent grant --alias ns/model --consumer NAME` |
-| "Stop NAME from using my model" | Revoke | `aweshare agent revoke --alias ns/model --consumer NAME` |
+| "Stop NAME from using my model" | Revoke (grant) | `aweshare agent revoke --alias ns/model --consumer NAME` |
+| "Suspend / bring back a user or token" | Hub admin | `aweshare hub token revoke` / `token restore` (reversible; a redeemed invite suspends its producer too — see Suspension semantics) |
 | "Who can use what?" | Browse | `aweshare agent list` |
 | "Set up a hub" | Hub setup | npm or Docker — see Hub Deployment; `init` prints the admin token once; user runs `serve`/container themselves |
 | "Issue a producer/consumer token" | Hub admin | `aweshare hub token issue --role R --name NAME` |
@@ -105,6 +110,7 @@ Running them from the user's laptop without both will fail ("no admin token at .
 | `AWESHARE_HEAD_TIMEOUT_MS` · `AWESHARE_IDLE_TIMEOUT_MS` | `120000` · `300000` | response-head timeout / stream idle timeout |
 | `AWESHARE_MAX_BODY_BYTES` | `32MB` | request body cap |
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | `10` | rate limit for the unauthenticated invite-redeem endpoint |
+| `AWESHARE_MAX_PRODUCERS` | `10` | max active producers — issue/redeem/restore refuse with `403 HUB_FULL` when full |
 
 ## Producer Admission via Invite Codes
 
@@ -120,7 +126,7 @@ aweshare hub invite create --count 10 [--expires-in 7d]
 aweshare agent join --hub https://<hub-host> --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
-Codes are single-use, optionally expiring, revocable until redeemed (`hub invite list` / `hub invite revoke --id N`). `hub invite list --reveal` re-shows codes created since plaintext storage landed (older ones are hash-only and unrecoverable — revoke and re-create). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, grant).
+Codes are single-use, optionally expiring, and revocable at any stage (`hub invite list` shows pending/used/suspended/revoked/expired; `hub invite revoke --id N`, undo with `hub invite restore --id N`). Revoking a **redeemed** code suspends the producer it minted (its token dies, tunnel closes) — one code, one producer; restoring from either side revives both. `hub invite list --reveal` re-shows stored codes (pre-v4 rows have no plaintext — revoke and re-create those). Redeem and issue respect the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, grant).
 
 ## Agent Config Structure (config.toml)
 

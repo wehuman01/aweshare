@@ -3,6 +3,31 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.4] - 2026-08-23
+
+### Added
+
+- Reversible suspension: `hub token restore --role R --id N` (API: `POST /admin/v1/tokens/{producers|consumers}/{id}/restore`) undoes `token revoke` — the same token works again, and nothing was deleted in between (grants, offerings, usage history survive a suspension). Suspended tokens now fail with a distinct `401 TOKEN_REVOKED` (message points at restore) instead of a bare invalid-key 401.
+- Invite/tenant lockstep: revoking a redeemed invite (`hub invite revoke --id N`) suspends the producer it minted and closes its tunnel; `hub invite restore --id N` (API: `POST /admin/v1/invites/{id}/restore`) brings it back. Revoking a producer token flags its invite, and restoring from either handle clears both sides — the code and the token are two handles for the same suspension.
+- Producer capacity cap: `AWESHARE_MAX_PRODUCERS` (default 10) — `hub token issue --role producer`, invite redeem and producer restore refuse with `403 HUB_FULL` when all slots are active. Suspended producers free their slot.
+- Liveness tracking: `last_seen_at` on producers (tunnel connect + heartbeat) and consumers (authenticated requests), throttled to one write per 10 minutes; shown as a `LAST SEEN` column in `hub token list`.
+- `hub invite list` now derives a lifecycle status per row: `pending` / `used` / `suspended` (its producer is suspended) / `revoked` / `expired`. Expired codes are lazily deleted when someone tries to redeem them.
+
+### Changed
+
+- **Breaking (security, schema v5):** tokens are stored hash-only again — the `token_plain` columns are dropped (auto-migrated) and `hub token list --reveal` / `?reveal=true` on `/admin/v1/tokens` is removed. Tokens are shown exactly once at issue/redeem and can never be re-displayed. Invite codes keep their plaintext (`hub invite list --reveal` still works). **Back up `hub.db` before upgrading — the v5 migration is not reversible and the database cannot roll back to an older version afterwards.** Deployments with more than 10 active producers should raise `AWESHARE_MAX_PRODUCERS` before upgrading.
+- Revocation semantics are now documented and implemented as reversible suspension everywhere: revoking never deletes rows, and the CLI help for `token revoke` / `invite revoke` says so.
+- README token-limit wording now describes TPM and lifetime limits as observed-usage thresholds, including their single-request and concurrent overshoot behavior.
+
+### Fixed
+
+- `hub token issue` with an already-taken name now returns `409 NAME_TAKEN` instead of an unhandled SQLite constraint error (500).
+- Revoking a producer token now closes its existing tunnel immediately instead of waiting for a disconnect.
+- Slow consumer responses now apply backpressure to the producer tunnel, bounding hub-side response buffering without changing the wire protocol.
+- `GET /v1/models` no longer lists offerings whose grant has expired.
+- Hub and agent version output now reads the root package version, removing release-time version drift.
+- Biome configuration and formatting are aligned with the locked toolchain so the CI check passes again.
+
 ## [0.3.3] - 2026-08-22
 
 ### Added

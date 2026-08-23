@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.3-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.4-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -55,7 +55,8 @@ Consumer (standard SDK, zero changes)         Producer side
 ## Trust boundary (read this first)
 
 - To route and meter, **consumer prompts and model responses transit the hub in plaintext — this is not end-to-end encryption**. The hub persists no request/response content, but the hub operator can technically see it. Only use a hub instance you trust — which is why the hub is open source and self-hostable.
-- Upstream API keys never leave the producer's device and are never sent to consumers; the hub authenticates tokens by SHA-256 hash. Since v4 the hub also stores the plaintext of tokens and invite codes it issues (NULL for older rows) so admins can re-display them with `hub token list --reveal` / `hub invite list --reveal` — treat the hub database as secret-bearing: a DB leak exposes every secret issued since v4.
+- Upstream API keys never leave the producer's device and are never sent to consumers. Tokens are stored **hash-only** (peppered SHA-256): the plaintext is shown exactly once at issue/redeem and can never be re-displayed. Invite codes are the deliberate exception — their plaintext is kept so the operator can re-view them with `hub invite list --reveal`; a DB leak exposes unredeemed codes, but no tokens.
+- Token revocation is **reversible suspension** (`hub token revoke` / `hub token restore`), and an invite and the producer it minted move together: revoking a redeemed code suspends that producer (and closes its tunnel), and restoring from either handle revives both. Nothing is deleted on revoke — grants, offerings and usage history survive a suspension.
 
 ### Compliance and disclaimer
 
@@ -229,7 +230,7 @@ aweshare hub consumer limits --name alice --clear    # back to hub-wide defaults
 
 Grants can also carry an expiry: `aweshare hub grant add --alias peng/gpt-4o --consumer alice --expires-in 7d` (or `aweshare agent grant … --expires-in 7d` on the producer side). An expired grant returns `403 GRANT_EXPIRED`; re-granting refreshes the expiry.
 
-Honest limits: token-based caps count what upstreams report — Ollama streams report no usage, so they contribute 0. TPM is best-effort (concurrent requests that all pass before any finishes can overshoot); the lifetime budget is exact because it sums persisted rows.
+Honest limits: token-based caps count what upstreams report — Ollama streams report no usage, so they contribute 0. Both TPM and the lifetime budget are observed-usage thresholds, not hard reservations: one request can cross the threshold, and concurrent requests that start before earlier usage is recorded can overshoot it further. Once recorded usage has reached the threshold, new requests are rejected.
 
 ## Endpoints and errors
 
@@ -240,7 +241,7 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 | `GET /healthz` | liveness |
 | `/admin/v1/*` | token/grant/usage management (admin or producer token) · consumer limit overrides: `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits` (admin only) |
 
-Error semantics: `401` invalid key · `403` not granted or `GRANT_EXPIRED` · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`QUOTA_EXCEEDED` = lifetime token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
+Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403` not granted or `GRANT_EXPIRED` · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`QUOTA_EXCEEDED` = lifetime token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
 
 Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Producers list grants with `aweshare agent list`; query usage with `aweshare hub usage`.
 
@@ -255,9 +256,9 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub init` | create data dir + admin token (printed once) |
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
 | `aweshare hub token issue --role producer\|consumer --name NAME` | issue a producer (`asp_…`) or consumer (`asc_…`) token |
-| `aweshare hub token list [--reveal]` · `aweshare hub token revoke --role R --id N` | list / revoke tokens (`--reveal` also shows the stored plaintext of tokens issued since v4) |
+| `aweshare hub token list` · `aweshare hub token revoke --role R --id N` · `aweshare hub token restore --role R --id N` | list (suspension state + last seen) / suspend / restore tokens — tokens are hash-only, save them at issue |
 | `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]` | create one-time invite codes (`asi_…`, printed once; re-view with `invite list --reveal`); with `--name` bound to that producer, without it the producer submits name + email at redeem |
-| `aweshare hub invite list [--reveal]` · `aweshare hub invite revoke --id N` | list / revoke (unredeemed) invites (`--reveal` re-shows codes created since v4) |
+| `aweshare hub invite list [--reveal]` · `aweshare hub invite revoke --id N` · `aweshare hub invite restore --id N` | list (status: pending/used/suspended/revoked/expired) / revoke / restore invites — revoking a redeemed code suspends the producer it minted; restore brings it back |
 | `aweshare hub grant add --alias ns/model --consumer NAME [--expires-in 7d]` | grant (or refresh) access to an alias |
 | `aweshare hub grant list` · `aweshare hub grant remove --alias A --consumer NAME` | list / remove grants |
 | `aweshare hub consumer limits --name NAME [--rps N] [--burst N] [--concurrency N] [--tpm N] [--max-total-tokens N] [--clear]` | per-consumer overrides (see Consumer limits) |
@@ -289,6 +290,8 @@ CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI 
 | `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | per-consumer limits |
 | `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 300000 | response-head timeout / stream idle timeout |
 | `AWESHARE_MAX_BODY_BYTES` | 32MB | request body cap |
+| `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | rate limit for the unauthenticated redeem endpoint |
+| `AWESHARE_MAX_PRODUCERS` | 10 | max active producers — `token issue`, invite redeem and restore refuse with `403 HUB_FULL` when full |
 | `AWESHARE_NO_UPDATE_CHECK` | unset | set to `1` to disable the passive update reminder |
 
 Health: agent heartbeats every 15s, silent 45s = dead; backends with 2 consecutive AUTH/QUOTA failures auto-degrade (alias shows `degraded`, dispatch stops), 30s probes recover. A new connection with the same producer token replaces the old one (latest-wins).
