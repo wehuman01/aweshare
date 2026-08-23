@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.7-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.8-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -236,13 +236,14 @@ maxConcurrency = 1                       # 本地模型从 1 起步，云端 API
 每个消费者默认套用全局配置（`AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY`，见运维一节）。在此之上，hub 管理员可以设置**稀疏的按消费者覆盖**——只设置你关心的项，其余继续走全局默认：
 
 ```bash
-# PUT /admin/v1/consumers/{name}/limits —— 稀疏 JSON，未设的键保持默认，
-# 后续 PUT 是合并，不是替换
+aweshare hub limits alice --tpm 60000 --max-total-tokens 5000000  # 设置（合并进已有覆盖）
+aweshare hub limits alice                                        # 查看当前覆盖
+aweshare hub limits alice --clear                                # 清空，回到全局默认
+
+# 同一组开关也可走 admin REST API（PUT / DELETE 同一路径）：
 curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
   -H "Authorization: Bearer asa_...（admin 令牌）" -H "content-type: application/json" \
   -d '{"tpm":60000,"maxTotalTokens":5000000}'
-
-# DELETE 同一路径即清空全部覆盖，回到全局默认
 ```
 
 | 键 | 含义 | 生效方式 |
@@ -266,7 +267,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 
 错误语义：`401` 无效密钥 · `401 TOKEN_REVOKED` 令牌被挂起（请联系运维者 restore） · `403` 未获授权或授权已过期（`GRANT_EXPIRED`） · `403 HUB_FULL` 生产者容量已满 · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`QUOTA_EXCEEDED` = 终身 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
 
-用量记录：每请求一行（别名、真实模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。生产者 `aweshare agent list` 查看授权；用量经 `GET /admin/v1/usage` 查询（admin 全量，生产者/消费者各看自己那份）。
+用量记录：每请求一行（别名、真实模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。生产者 `aweshare agent list` 查看授权；用量用 `aweshare hub usage` 或 `GET /admin/v1/usage` 查询（admin 全量，生产者/消费者各看自己那份）。
 
 ## 常用命令
 
@@ -280,9 +281,11 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in 7d]` | 铸造一次性邀请码（`asi_…`，只打印一次；可用 `list --reveal` 重新查看）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
 | `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | 查看 hub 状态：邀请码生命周期（ROLE + 谁兑换的，`--reveal` 显码、`--token` 显示换出的令牌），或 producers/consumers 名册（状态 + 最近活跃） |
+| `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
+| `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | 最近请求用量，新在前——每请求一行，内容零落库 |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
 
-CLI 只管邀请码：令牌签发、消费者限额与用量在收窄时移出了 CLI——都在 admin REST API 上（`/admin/v1/*`，见「端点与错误」）。授权归生产者所有，从来不在运营者的 CLI 上：在生产者机器上用 `aweshare agent grant`/`revoke`/`list` 管理（admin API 保留只读审计）。
+令牌签发统一走邀请码（两种角色）。`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。授权归生产者所有，从来不在运营者的 CLI 上：在生产者机器上用 `aweshare agent grant`/`revoke`/`list` 管理（admin API 保留只读审计）。
 
 list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 

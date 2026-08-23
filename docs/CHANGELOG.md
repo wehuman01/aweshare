@@ -3,6 +3,13 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.8] - 2026-08-23
+
+### Added
+
+- **`aweshare hub limits NAME`** — per-consumer limit overrides are back on the CLI as a thin wrapper over the unchanged `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`: bare `aweshare hub limits alice` shows the current overrides (or that none are set), value flags merge (`--rps 5 --max-concurrent 2 --tpm 60000 --max-total-tokens 5000000`, kebab-case mapping to the API keys; unset keys keep the hub-wide `AWESHARE_CONSUMER_*` defaults), and `--clear` drops everything back to defaults. Positive-number checks run client-side; integer/precision rules stay server-side so its error lists every problem in one shot. `--json` prints the raw API response, matching `list`.
+- **`aweshare hub usage`** — the metered request log, newest first, as an aligned table (TIME/CONSUMER/ALIAS/MODEL/STATUS/TOOK/TOKENS; NULL token counts such as Ollama streams render as `-`, error rows carry their code). `--consumer NAME`, `--alias ns/model` and `--limit N` (1..1000, default 100) narrow it; usage rows carry consumer ids, which the CLI maps to names via the roster — one extra call, no API change. `--json` prints the raw rows. `hub usage` left the retired-command list; the `hub consumer` pointer now routes to `hub invite --role consumer` / `hub limits NAME`.
+
 ## [0.3.7] - 2026-08-23
 
 ### Added

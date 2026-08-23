@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.7-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.8-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -236,13 +236,14 @@ Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; 
 Every consumer gets the hub-wide defaults (`AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY`, see Operations). On top of that, the hub admin can set **sparse per-consumer overrides** — only the keys you set take effect, everything else keeps the defaults:
 
 ```bash
-# PUT /admin/v1/consumers/{name}/limits — sparse JSON; unset keys keep the defaults,
-# later PUTs merge into what is stored
+aweshare hub limits alice --tpm 60000 --max-total-tokens 5000000  # set (merges into stored)
+aweshare hub limits alice                                        # view current overrides
+aweshare hub limits alice --clear                                # back to hub-wide defaults
+
+# the same knobs over the admin REST API (PUT / DELETE the same path):
 curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
   -H "Authorization: Bearer asa_... (the admin token)" -H "content-type: application/json" \
   -d '{"tpm":60000,"maxTotalTokens":5000000}'
-
-# DELETE the same path clears all overrides back to the hub-wide defaults
 ```
 
 | Key | Meaning | Enforcement |
@@ -266,7 +267,7 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 
 Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403` not granted or `GRANT_EXPIRED` · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`QUOTA_EXCEEDED` = lifetime token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
 
-Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Producers list grants with `aweshare agent list`; usage is queried via `GET /admin/v1/usage` (admin sees everything, producers and consumers their own slice).
+Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Producers list grants with `aweshare agent list`; usage is queried with `aweshare hub usage` or `GET /admin/v1/usage` (admin sees everything, producers and consumers their own slice).
 
 ## Command reference
 
@@ -280,9 +281,11 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in 7d]` | mint one-time invite codes (`asi_…`, printed once; re-view with `list --reveal`); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
 | `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` minted tokens), or the producer/consumer rosters with status and last seen |
+| `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
+| `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | recent requests, newest first — one row per request, zero content stored |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
 
-The CLI is invite-only: token issuance, consumer limits and usage left it when it narrowed — they live on the admin REST API (`/admin/v1/*`, see Endpoints and errors). Grants are producer-owned and were never the operator's CLI: manage them with `aweshare agent grant`/`revoke`/`list` on the producer machine (the admin API keeps read-only audit access).
+Token issuance runs through invites (both roles). `limits` and `usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too. Grants are producer-owned and were never the operator's CLI: manage them with `aweshare agent grant`/`revoke`/`list` on the producer machine (the admin API keeps read-only audit access).
 
 `list` prints an aligned table by default; append `--json` for the raw API response.
 
