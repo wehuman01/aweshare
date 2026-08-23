@@ -16,25 +16,24 @@ You may run these read-only commands:
 - `aweshare agent config show` (secrets redacted)
 - `aweshare agent doctor`
 - `aweshare agent list`
-- `aweshare hub token list` (suspension state + last seen; tokens are hash-only at rest — no --reveal exists, save tokens at issue)
-- `aweshare hub invite list` (`--reveal` re-shows stored invite codes; statuses: pending/used/suspended/revoked/expired)
-- `aweshare hub grant list`
-- `aweshare hub usage [--alias ALIAS]`
+- `aweshare hub list` (invite lifecycle: pending/used/suspended/revoked/expired; `--reveal` re-shows stored invite codes; `--token` shows the producer token each invite minted, with last seen)
 - `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
 
 You may also run these commands (they modify files/state but are non-interactive):
-- `aweshare agent config init` — write config template + empty secrets (no-op if they exist)
+- `aweshare agent init [--hub URL] [--token asp_...]` — write config template + empty secrets (no-op if they exist)
 - `aweshare agent config edit` — open config in `$VISUAL`/`$EDITOR`/`vi`
 - `aweshare agent grant --alias ALIAS --consumer NAME [--expires-in 7d|12h|30m|90s]`
 - `aweshare agent revoke --alias ALIAS --consumer NAME`
-- `aweshare hub init`, `aweshare hub token issue`, `aweshare hub token revoke`, `aweshare hub token restore --role R --id N`
-- `aweshare hub invite create [--name NAME] [--count N] [--expires-in 7d]`, `aweshare hub invite revoke --id N`, `aweshare hub invite restore --id N` — one-time producer invite codes (`asi_…`, printed once; re-view with `invite list --reveal`)
+- `aweshare hub init`
+- `aweshare hub invite [--name NAME] [--count N] [--expires-in 7d]` — mint one-time producer invite codes (`asi_…`, printed once; re-view with `hub list --reveal`)
+- `aweshare hub revoke --id N`, `aweshare hub restore --id N` — kill / revive an invite; a redeemed one carries its producer with it
 - `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
-- `aweshare hub grant add|remove`, `aweshare hub consumer limits` (flags: `--rps` `--burst` `--concurrency` `--tpm` `--max-total-tokens` `--clear`)
+
+Identity and permission are split: the operator owns admission (invite codes for producers, `asc_…` keys for consumers via the admin API); each producer owns the grants for their namespace. The hub CLI is invite-only (like awewarm-hub); token issuance, consumer limits and usage are admin REST API territory (`/admin/v1/*` with the admin token — use curl). Grants are producer-owned: `agent grant`/`revoke`/`list` is the only management path — admin-token writes get `403 NOT_GRANTED`; the admin API keeps read-only audit access (`GET /admin/v1/grants`). This holds for private hubs (operator == producer) and community hubs (mutually unaffiliated producers) alike.
 
 ## Suspension semantics (hub)
 
-Token revocation is **reversible suspension**, never deletion: `hub token revoke --role R --id N` sets the suspension flag (closes a producer's tunnel at once); `hub token restore --role R --id N` clears it — the same token works again, and grants/offerings/usage survived. Suspended tokens get `401 TOKEN_REVOKED` (not a bare invalid key). An invite and the producer it minted move together: revoking a redeemed code suspends that producer, and restoring from either handle (`invite restore` or `token restore`) revives both; restoring a producer needs a free slot (`403 HUB_FULL` when `AWESHARE_MAX_PRODUCERS`, default 10, active producers are reached — the cap also gates `token issue --role producer` and invite redeem).
+Revocation is **reversible suspension**, never deletion, and the invite is the operator's handle: `hub revoke --id N` suspends (a pending code stops pairing; a redeemed one suspends its producer and closes its tunnel at once); `hub restore --id N` brings both back. Suspended tokens get `401 TOKEN_REVOKED` (not a bare invalid key). An invite and the producer it minted move together from either handle; restoring a redeemed producer needs a free slot (`403 HUB_FULL` when `AWESHARE_MAX_PRODUCERS`, default 10, active producers are reached — the cap also gates admin-API token issuance and invite redeem).
 
 ## Intent Router
 
@@ -48,13 +47,13 @@ Token revocation is **reversible suspension**, never deletion: `hub token revoke
 | "Something doesn't work" | Diagnose | `aweshare agent doctor` — fix the first FAIL |
 | "Let NAME use my model" | Grant | `aweshare agent grant --alias ns/model --consumer NAME` |
 | "Stop NAME from using my model" | Revoke (grant) | `aweshare agent revoke --alias ns/model --consumer NAME` |
-| "Suspend / bring back a user or token" | Hub admin | `aweshare hub token revoke` / `token restore` (reversible; a redeemed invite suspends its producer too — see Suspension semantics) |
+| "Suspend / bring back a user or token" | Hub admin | `aweshare hub revoke --id N` / `restore --id N` (by invite, reversible — see Suspension semantics) |
 | "Who can use what?" | Browse | `aweshare agent list` |
 | "Set up a hub" | Hub setup | npm or Docker — see Hub Deployment; `init` prints the admin token once; user runs `serve`/container themselves |
-| "Issue a producer/consumer token" | Hub admin | `aweshare hub token issue --role R --name NAME` |
-| "Rate-limit or cap a consumer" | Hub admin | `aweshare hub consumer limits --name NAME --rps N --tpm N --max-total-tokens N ...` |
-| "How much was used?" | Metering | `aweshare hub usage` |
-| "Invite producers without hand-delivering tokens" | Invite codes | `aweshare hub invite create --name NAME` (bound) or `--count N` (unbound); producer redeems via `aweshare agent join` — see Producer Admission |
+| "Issue a consumer token (asc_)" | Hub admin | admin API: `POST /admin/v1/tokens` with `{"role":"consumer","name":NAME}` + admin token (curl); producers join via invites, never direct issuance |
+| "Rate-limit or cap a consumer" | Hub admin | admin API: `PUT /admin/v1/consumers/NAME/limits` (JSON keys `rps`/`burst`/`maxConcurrent`/`tpm`/`maxTotalTokens`; DELETE clears) |
+| "How much was used?" | Metering | admin API: `GET /admin/v1/usage` (admin/producer/consumer key, each sees its own slice) |
+| "Invite producers without hand-delivering tokens" | Invite codes | `aweshare hub invite --name NAME` (bound) or `--count N` (unbound); producer redeems via `aweshare agent join` — see Producer Admission |
 | "Point Claude Code / an SDK at the hub" | Consumer | Explain env vars (see Consumer Setup) |
 | "Update aweshare itself", "upgrade the CLI/hub" | Self-Update | `aweshare self-update --check` first, then see Self-Update (npm vs Docker differ) |
 
@@ -93,9 +92,9 @@ The repo also ships a `docker-compose.yml` (port, volume, limit-tuning env vars)
 
 ### Administering a remote hub
 
-Hub admin commands (`token issue/list/revoke`, `grant add/remove/list`, `consumer limits`, `usage`) read the admin token file `<AWESHARE_HUB_DATA_DIR>/admin-token` and call the admin API at `AWESHARE_HUB_URL` (default `http://127.0.0.1:8787`). When the hub runs on a server:
+Hub CLI admin commands (`invite`, `list`, `revoke`, `restore`) read the admin token file `<AWESHARE_HUB_DATA_DIR>/admin-token` and call the admin API at `AWESHARE_HUB_URL` (default `http://127.0.0.1:8787`). When the hub runs on a server:
 
-- run the commands on the server (`ssh` + CLI, or `docker exec aweshare-hub aweshare hub token issue ...`), or
+- run the commands on the server (`ssh` + CLI, or `docker exec aweshare-hub aweshare hub invite ...`), or
 - run them locally with `AWESHARE_HUB_URL=https://<hub-host>` and the admin-token file placed in a local `AWESHARE_HUB_DATA_DIR`.
 
 Running them from the user's laptop without both will fail ("no admin token at ..." or connection refused) — check this before treating it as a hub malfunction.
@@ -114,19 +113,19 @@ Running them from the user's laptop without both will fail ("no admin token at .
 
 ## Producer Admission via Invite Codes
 
-Besides the admin issuing a producer token (`hub token issue --role producer`) and handing over the secret, producers can self-service:
+Producers self-service through one-time invite codes (the CLI's only admission path):
 
 ```bash
 # bound: locked to one producer name
-aweshare hub invite create --name peng [--expires-in 7d]      # → asi_..., send to the producer
+aweshare hub invite --name peng [--expires-in 7d]      # → asi_..., send to the producer
 # unbound: batch hand-out; producer submits name + email at redeem
-aweshare hub invite create --count 10 [--expires-in 7d]
+aweshare hub invite --count 10 [--expires-in 7d]
 
 # producer side — redeems the code, writes the token into their config:
 aweshare agent join --hub https://<hub-host> --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
-Codes are single-use, optionally expiring, and revocable at any stage (`hub invite list` shows pending/used/suspended/revoked/expired; `hub invite revoke --id N`, undo with `hub invite restore --id N`). Revoking a **redeemed** code suspends the producer it minted (its token dies, tunnel closes) — one code, one producer; restoring from either side revives both. `hub invite list --reveal` re-shows stored codes (pre-v4 rows have no plaintext — revoke and re-create those). Redeem and issue respect the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, grant).
+Codes are single-use, optionally expiring, and revocable at any stage (`hub list` shows pending/used/suspended/revoked/expired; `hub revoke --id N`, undo with `hub restore --id N`). Revoking a **redeemed** code suspends the producer it minted (its token dies, tunnel closes) — one code, one producer; restore revives both. `hub list --reveal` re-shows stored codes (pre-v4 rows have no plaintext — revoke and re-create those); `hub list --token` shows which producer token each code minted and when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, grant).
 
 ## Agent Config Structure (config.toml)
 
@@ -193,7 +192,7 @@ aweshare agent revoke --alias peng/gpt-4o --consumer alice
 aweshare agent list
 ```
 
-Hub-side equivalents (`aweshare hub grant add|remove|list`) do the same thing via the admin API.
+Grants are producer-owned: writes need the producer token of the alias namespace, so these commands are the only path (an admin token gets `403 NOT_GRANTED`). The admin API keeps read-only audit access (`GET /admin/v1/grants`).
 
 ### Verify configuration
 
@@ -257,5 +256,5 @@ Before sharing a backend, warn the user: relaying a personal-subscription API ke
 3. Never print or copy upstream API keys from secrets.json. Use `aweshare agent config show` (redacted) when showing config to the user.
 4. Offering aliases must be `namespace/name` (lowercase) with the namespace matching the producer token's name; names are globally unique on the hub.
 5. Use `aweshare agent doctor` after any config change; fix the first FAIL, then re-run.
-6. `aweshare agent config init` (like `agent init`) is a no-op if files already exist — it will not clobber.
+6. `aweshare agent init` is a no-op if the files already exist — it will not clobber.
 7. Hub admin commands need the admin token from `aweshare hub init` output; it is printed only once. They read `<AWESHARE_HUB_DATA_DIR>/admin-token` and dial `AWESHARE_HUB_URL` (default `http://127.0.0.1:8787`) — for a remote hub see Hub Deployment.

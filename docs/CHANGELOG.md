@@ -3,6 +3,20 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.5] - 2026-08-23
+
+### Changed
+
+- **Breaking (API):** grant writes are producer-owned — `PUT`/`DELETE /admin/v1/grants` now accept only the producer token of the alias namespace; admin-token writes get `403 NOT_GRANTED` (reads stay: admin sees all for audit, producers their own slice). Identity and permission are now split by design: the operator issues identities (invites, consumer keys) and governs (suspend/restore, limits, usage); each producer alone decides who may call their aliases — one rule for private hubs (operator == producer) and community hubs (mutually unaffiliated producers). `aweshare hub grant` points at `aweshare agent grant`.
+- **Breaking (CLI):** `aweshare agent config init` removed — `aweshare agent init` is the same behavior plus `--hub`/`--token` pre-fill; the old spelling prints a pointer. Flag-only agent commands (`init`/`join`/`doctor`/`start`/`grant`/`revoke`/`list`) now reject stray positional arguments instead of silently ignoring them, matching the hub CLI.
+- **Breaking (CLI):** the hub CLI narrowed to the invite workflow, modeled on awewarm-hub — `invite create` became `invite` (flags unchanged: `--name`, `--count`, `--expires-in`), `invite list` became `list` (plus a new `--token` showing the producer token each invite minted, with last seen), and `invite revoke`/`invite restore` became flat `revoke --id N` / `restore --id N`. The `token`, `grant`, `consumer` and `usage` command groups left the CLI — the admin REST API (`/admin/v1/*`) still serves token/limit/usage management, and grants are producer-owned (`aweshare agent grant`/`revoke`/`list`). Producers are admitted via invites only; consumer keys (`asc_…`) are issued directly through the admin API.
+- Hub and agent `--help` narrowed to one-line command descriptions (matching awewarm-hub / peng-code-zen layout); every command now answers `-h` with its own flags, and the umbrella `aweshare -h` lists the new surfaces.
+- Server-side error hints now point at the new commands (`aweshare hub revoke --id N` / `aweshare hub restore`).
+
+### Added
+
+- `hub list --token`: TOKEN (`#id name`) and SEEN columns join the invite table — the operator sees who redeemed which code and whether that producer is alive. The API (`GET /admin/v1/invites`) now returns `producer_name` and `producer_last_seen_at` on each row.
+
 ## [0.3.4] - 2026-08-23
 
 ### Added
