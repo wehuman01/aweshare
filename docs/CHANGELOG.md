@@ -3,6 +3,18 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.6] - 2026-08-23
+
+### Added
+
+- `GET /healthz` now identifies the hub: `{ok, version, wire}` (was `{ok}` alone). `aweshare agent join` preflights it before burning the one-time invite, so each failure gets its own fix: unreachable hub, "answered but not an aweshare hub" (wrong URL / non-JSON), WAF-blocked 403 (Cloudflare bot protection), or a wire-version skew that previously only surfaced at `start`. `agent doctor` reports the hub version in its hub line, and `join` prints the hub version it paired with.
+- `aweshare agent join --allow-http`: escape hatch for pairing with a plain-HTTP hub outside the LAN. Without it, join refuses — the producer token would cross the network unencrypted — and points at https (e.g. a Cloudflare tunnel) or a LAN address instead. Loopback/private/link-local IPs and `localhost`/`*.local` names stay allowed silently.
+
+### Changed
+
+- Every agent→hub HTTP call (`join`, `doctor`, `grant`, `revoke`, `list`) and the producer WebSocket now identify themselves as `aweshare-agent/<version>` (the WebSocket previously sent a bare `ws/8.x` UA; Node fetch sends none — anonymous UAs sit on Cloudflare Bot Fight Mode's blocklist) and carry a 10s timeout — an unreachable hub used to hang `join` and the grant commands forever. The hub CLI's localhost admin calls gained the same 10s timeout.
+- Agent CLI internals: each command is now one function (`runInit`/`runJoin`/…), and all hub access goes through `apps/agent/src/hub.ts` — one User-Agent, one timeout policy, one error shape — with unit tests. No command surface changes.
+
 ## [0.3.5] - 2026-08-23
 
 ### Changed
