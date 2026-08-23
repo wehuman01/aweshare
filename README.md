@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.6-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.7-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -100,7 +100,18 @@ aweshare hub invite --count 10 [--expires-in 7d]
 aweshare agent join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
-Consumers are few and known — their keys (`asc_…`) are issued directly via the admin API (the hub CLI is invite-only):
+Consumers join the same way — a consumer code redeems into an `asc_` key the consumer keeps (no aweshare install needed):
+
+```bash
+aweshare hub invite --role consumer --name alice [--expires-in 7d]   # → asi_..., send to the consumer
+
+# the consumer redeems it themselves with one curl:
+curl -s -X POST https://hub.example.com/invites/v1/redeem \
+  -H 'content-type: application/json' -d '{"code":"asi_..."}'
+# → {"role":"consumer","name":"alice","token":"asc_..."} — set as the SDK API key
+```
+
+Prefer hand-delivering keys? Direct issuance still works via the admin API:
 
 ```bash
 curl -X POST https://hub.example.com/admin/v1/tokens \
@@ -112,7 +123,7 @@ Three token roles, one per party:
 
 | Role | Who holds it | How it's used |
 |---|---|---|
-| `admin` | hub operator (you only) | the admin REST API (`/admin/v1/*`); CLI side: `hub invite` / `list` / `revoke` / `restore` |
+| `admin` | hub operator (you only) | the admin REST API (`/admin/v1/*`); CLI side: `hub invite` / `list [invites\|producers\|consumers]` / `revoke` / `restore` |
 | `producer` (`asp_...`) | the agent on the producer's machine | set as `token` in `~/.aweshare/config.toml`; the agent registers its offerings with it |
 | `consumer` (`asc_...`) | whoever calls the models | set in SDK env vars (`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`); the hub uses it to decide which aliases they may call |
 
@@ -146,6 +157,10 @@ aweshare agent start
 ### 3. Consumer first run (in this order)
 
 ```bash
+# ⓪ redeem your invite code (skip if the operator handed you an asc_ key directly)
+curl -s -X POST https://hub.example.com/invites/v1/redeem \
+  -H 'content-type: application/json' -d '{"code":"asi_..."}'   # → your asc_ token
+
 # ① one small curl to prove the path
 curl https://hub.example.com/v1/chat/completions \
   -H "Authorization: Bearer asc_..." -H "content-type: application/json" \
@@ -263,8 +278,8 @@ Both sides at a glance — details in the sections above.
 |---|---|
 | `aweshare hub init` | create data dir + admin token (printed once) |
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
-| `aweshare hub invite [--name NAME] [--count N] [--expires-in 7d]` | mint one-time invite codes (`asi_…`, printed once; re-view with `list --reveal`); with `--name` bound to that producer, without it the producer submits name + email at redeem |
-| `aweshare hub list [--reveal] [--token]` | list invites (status: pending/used/suspended/revoked/expired); `--reveal` shows the codes, `--token` shows the producer token each minted, with last seen |
+| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in 7d]` | mint one-time invite codes (`asi_…`, printed once; re-view with `list --reveal`); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
+| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` minted tokens), or the producer/consumer rosters with status and last seen |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
 
 The CLI is invite-only: token issuance, consumer limits and usage left it when it narrowed — they live on the admin REST API (`/admin/v1/*`, see Endpoints and errors). Grants are producer-owned and were never the operator's CLI: manage them with `aweshare agent grant`/`revoke`/`list` on the producer machine (the admin API keeps read-only audit access).

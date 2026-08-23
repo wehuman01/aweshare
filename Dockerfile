@@ -20,6 +20,8 @@ FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production AWESHARE_HUB_DATA_DIR=/data
 COPY --from=build /app/node_modules ./node_modules
+# apps/hub/dist reads the monorepo root package.json (VERSION) via ../../../package.json
+COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/packages/protocol/package.json ./packages/protocol/
 COPY --from=build /app/packages/protocol/dist ./packages/protocol/dist
 COPY --from=build /app/apps/hub/node_modules ./apps/hub/node_modules

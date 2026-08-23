@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.6-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.7-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -100,7 +100,18 @@ aweshare hub invite --count 10 [--expires-in 7d]
 aweshare agent join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
-消费者少而可信——密钥（`asc_…`）直接经 admin API 签发（hub CLI 只管邀请码）：
+消费者以同样方式加入——consumer 邀请码兑换后得到消费者自己保管的 `asc_` 密钥（无需安装 aweshare）：
+
+```bash
+aweshare hub invite --role consumer --name alice [--expires-in 7d]   # → asi_...，发给消费者
+
+# 消费者自己用一条 curl 兑换：
+curl -s -X POST https://hub.example.com/invites/v1/redeem \
+  -H 'content-type: application/json' -d '{"code":"asi_..."}'
+# → {"role":"consumer","name":"alice","token":"asc_..."} —— 填进 SDK 的 API key
+```
+
+想直接递密钥也行——admin API 直发仍然可用：
 
 ```bash
 curl -X POST https://hub.example.com/admin/v1/tokens \
@@ -112,7 +123,7 @@ curl -X POST https://hub.example.com/admin/v1/tokens \
 
 | 角色 | 谁持有 | 怎么用 |
 |---|---|---|
-| `admin` | Hub 操作者（只有你） | admin REST API（`/admin/v1/*`）；CLI 侧：`hub invite` / `list` / `revoke` / `restore` |
+| `admin` | Hub 操作者（只有你） | admin REST API（`/admin/v1/*`）；CLI 侧：`hub invite` / `list [invites\|producers\|consumers]` / `revoke` / `restore` |
 | `producer`（`asp_...`） | 生产者机器上的 agent | 写进 `~/.aweshare/config.toml` 的 `token` 字段，agent 靠它向 hub 注册 offering |
 | `consumer`（`asc_...`） | 调用模型的一方 | 填在 SDK 环境变量（`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`）里，hub 靠它判断能调哪些别名 |
 
@@ -146,6 +157,10 @@ aweshare agent start
 ### 3. 消费者首跑（按顺序）
 
 ```bash
+# ⓪ 兑换你的邀请码（操作者直接给 asc_ 密钥的可跳过）
+curl -s -X POST https://hub.example.com/invites/v1/redeem \
+  -H 'content-type: application/json' -d '{"code":"asi_..."}'   # → 你的 asc_ 密钥
+
 # ① curl 一发小请求确认链路
 curl https://hub.example.com/v1/chat/completions \
   -H "Authorization: Bearer asc_..." -H "content-type: application/json" \
@@ -263,8 +278,8 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
-| `aweshare hub invite [--name NAME] [--count N] [--expires-in 7d]` | 铸造一次性邀请码（`asi_…`，只打印一次；可用 `list --reveal` 重新查看）；带 `--name` 绑定该生产者，不带则由生产者兑换时提交 name + email |
-| `aweshare hub list [--reveal] [--token]` | 列出邀请码（状态：pending/used/suspended/revoked/expired）；`--reveal` 显示完整码，`--token` 显示各码换出的 producer 令牌与最近活跃 |
+| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in 7d]` | 铸造一次性邀请码（`asi_…`，只打印一次；可用 `list --reveal` 重新查看）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
+| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | 查看 hub 状态：邀请码生命周期（ROLE + 谁兑换的，`--reveal` 显码、`--token` 显示换出的令牌），或 producers/consumers 名册（状态 + 最近活跃） |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
 
 CLI 只管邀请码：令牌签发、消费者限额与用量在收窄时移出了 CLI——都在 admin REST API 上（`/admin/v1/*`，见「端点与错误」）。授权归生产者所有，从来不在运营者的 CLI 上：在生产者机器上用 `aweshare agent grant`/`revoke`/`list` 管理（admin API 保留只读审计）。

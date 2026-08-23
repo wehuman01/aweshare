@@ -3,6 +3,17 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.7] - 2026-08-23
+
+### Added
+
+- **Consumer invites** — admission is now invite-only for both roles: `aweshare hub invite --role consumer --name alice` mints a code that redeems into an `asc_` consumer token. Consumers redeem it themselves with one curl against the existing public `POST /invites/v1/redeem` (rate-limited as before) and keep the returned token for their SDK env vars — no aweshare install on their side. Consumer invites are bound-only (the name is the handle grants reference) and single (no `--count`); names clash across roles, matching admin-API issuance. The redeem answer now carries `role`, and `aweshare agent join` asserts `expectRole: 'producer'` so mixing up codes fails with `409 INVITE_ROLE_MISMATCH` **without burning the code** (pre-expectRole hubs are covered too: an `asc_` token back is reported honestly). Revocation keeps its lockstep: revoking a redeemed consumer invite suspends the consumer it minted, restore revives it, and suspending via the admin token handle (`DELETE /admin/v1/tokens/consumers/:id`) now flags the invite as well (previously consumer tokens had no invite pairing). Schema v6 adds `invites.role` + `invites.consumer_id` (existing rows default to producer). Direct admin-API issuance remains available.
+- **`hub list producers` / `hub list consumers`** — read-only rosters from the existing `GET /admin/v1/tokens`: name, email (producers), suspension status and last seen — the audit view that left the CLI in 0.3.5, modeled on awewarm-hub's `list users`. `hub list` (invites) gains a ROLE column and shows consumer-side minted tokens in `--token`; `hub list` bare still means invites. The removed-command pointer for `hub token` now points here.
+
+### Fixed
+
+- The hub Docker image (`ghcr.io/wehuman01/aweshare`) crashed on startup: `apps/hub/dist` reads the monorepo root `package.json` for its version, and the image's run stage never copied it — `ENOENT: /app/package.json`, an instant crash loop that surfaced as 502 behind fronting tunnels. The file now ships in the image.
+
 ## [0.3.6] - 2026-08-23
 
 ### Added
