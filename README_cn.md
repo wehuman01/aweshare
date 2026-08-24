@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.1-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.2-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -265,7 +265,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `POST /v1/chat/completions` · `POST /v1/messages` · `POST /v1/responses` | 推理入口（Bearer 或 `x-api-key`） |
 | `GET /v1/models` | hub 上已注册的全部别名与状态 |
-| `GET /v1/catalog` | hub 全部 offering——生产者、别名、协议、状态、按别名的限额（`aweshare consumer list` 的发现视图） |
+| `GET /v1/catalog` | hub 全部 offering——生产者、别名、协议、状态、按别名的限额及当日已用/剩余 token（`aweshare consumer list` 的发现视图） |
 | `GET /healthz` | 存活探测 |
 | `/admin/v1/*` | 令牌/限额/用量管理（admin 或生产者令牌）· 消费者限制覆盖：`GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`（仅 admin） |
 
@@ -302,6 +302,7 @@ list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 | `aweshare producer config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
 | `aweshare producer doctor [--status]` | 端到端诊断：后台实例、配置、后端探测、hub、最近日志（`--status` 跳过网络探测，秒回） |
 | `aweshare producer start [--background]` | 连接并转发（长驻进程；`--background` 转入后台——日志写 `~/.aweshare/producer.log`，pid 写 `producer.pid`） |
+| `aweshare producer reload` | 通知后台 producer（SIGHUP）重读 `config.toml` + `secrets.json`，并在既有隧道上重新注册 offerings——不断连；配置有误时保留旧值继续服务 |
 | `aweshare producer stop` | 停止后台 producer（SIGTERM，10 秒后 SIGKILL）并清理 pidfile |
 
 **消费者侧**——两条命令，跑在消费者机器上；日常使用时标准 SDK 直连 hub（见「消费工具配置」）：
@@ -309,7 +310,7 @@ list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 | 命令 | 用途 |
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list --token` 找回） |
-| `aweshare consumer list --hub URL --token asc_… [--json]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额 |
+| `aweshare consumer list --hub URL --token asc_… [--json]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额及当日剩余 token |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 
@@ -318,6 +319,8 @@ CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--chec
 没有常开的机器可以共享，或者想用别人共享的模型？项目开发者运营着一个社区 hub：**https://aweshare.wehuman.top**（邀请制——向 peng@wehuman.top 申请邀请码）；[docs/community-hub/](./docs/community-hub/README_cn.md) 是面向生产者/消费者的逐步接入指南（English version）。
 
 hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Docker 内是 `/data/config.toml`）。`aweshare hub init` 会生成模板，全部键注释着——取消注释即覆盖默认值。键名与下表同义、用 camelCase（`consumerRps`、`headTimeoutMs`…）。优先级：`serve` 参数（`--host`/`--port`）> 环境变量 > config.toml > 默认值。文件有问题（非法 TOML、未知键、非正数值）启动即报错并指名键；`AWESHARE_HUB_DATA_DIR` 本身只能用环境变量（它决定文件在哪）。
+
+**热加载**：除 host/port 外，表中所有可调参数都支持运行中 `SIGHUP` 生效（`kill -HUP <pid>`；Docker 用 `docker kill -s HUP aweshare-hub`）——先校验新文件，写坏了只记日志、继续用旧值服务。环境变量在进程启动时就固定了，被 `AWESHARE_*` 钉住的键不受重载影响（与启动时同一优先级）；host/port 仍需重启。生产者侧的 offerings 与限额用 `aweshare producer reload` 热加载。
 
 | 环境变量 | 默认 | 说明 |
 |---|---|---|

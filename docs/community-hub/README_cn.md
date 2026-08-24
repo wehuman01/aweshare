@@ -114,7 +114,7 @@ curl https://aweshare.wehuman.top/v1/chat/completions \
 
 ## 配额与公平使用
 
-单模型的护栏由生产者设定（`maxConcurrency`、并发消费者数、每日 token 预算——`consumer list` 里可见）。hub 另有全局准入上限（生产者名额当前 10 个）和限流。触顶时 429 报错会写明原因。
+单模型的护栏由生产者设定（`maxConcurrency`、并发消费者数、每日 token 预算及剩余——`consumer list` 里可见）。hub 另有全局准入上限（生产者名额当前 10 个）和限流。触顶时 429 报错会写明原因。
 
 ## 常见问题
 
@@ -124,7 +124,7 @@ curl https://aweshare.wehuman.top/v1/chat/completions \
 
 **我的 Claude Code 只会说 Anthropic 方言，别名却是 `openai`。** 正常——hub 不做协议翻译。按别名的 protocol 列选对应端点；工具实在不支持切换的话，本地加一层翻译代理。
 
-**我共享的东西被滥用了。** 收回你发布的：停掉 producer，改配置，重启。更严重的情况联系运维者，他可以停用身份。
+**我共享的东西被滥用了。** 收回你发布的：改配置删掉对应 offering，然后 `aweshare producer reload` 热加载（不用重启；目录会即时从 hub 下架）。更严重的情况联系运维者，他可以停用身份。
 
 **服务哪天没了怎么办？** 这是开发者个人运营的服务，没有可用性承诺。生产者损失的只是连接本身（配置和 key 都在本地）；消费者需要另找 hub。
 

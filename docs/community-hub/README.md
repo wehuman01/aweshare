@@ -114,7 +114,7 @@ Then point any tool that accepts a custom OpenAI/Anthropic base URL at the hub a
 
 ## Caps and fair use
 
-Per-offering guardrails are set by the producer (`maxConcurrency`, distinct concurrent consumers, daily token budget — visible in `consumer list`). The hub also applies global admission limits (producers are capped, currently 10) and rate limiting. Hit a cap and the 429 error names it.
+Per-offering guardrails are set by the producer (`maxConcurrency`, distinct concurrent consumers, daily token budget and remaining — visible in `consumer list`). The hub also applies global admission limits (producers are capped, currently 10) and rate limiting. Hit a cap and the 429 error names it.
 
 ## FAQ
 
@@ -124,7 +124,7 @@ Per-offering guardrails are set by the producer (`maxConcurrency`, distinct conc
 
 **My Claude Code only speaks Anthropic and the alias is `openai`.** Correct — the hub does not translate protocols. Use an endpoint matching the alias's protocol column, or a local translation proxy if your tool has no such setting.
 
-**Something I shared was abused.** Revoke what you published: stop the producer, edit the config, restart. For anything more serious contact the operator, who can suspend identities.
+**Something I shared was abused.** Revoke what you published: remove the offering from your config and run `aweshare producer reload` — it hot-applies without a restart and the alias leaves the hub's catalog at once. For anything more serious contact the operator, who can suspend identities.
 
 **What if the service goes away?** It is run personally by the developer with no uptime guarantees. Producers lose nothing but their connection (config and keys stay local); consumers need a new hub.
 

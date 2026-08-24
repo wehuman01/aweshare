@@ -27,6 +27,7 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]` — show (bare), merge or clear one consumer's limit overrides
 - `aweshare hub revoke --id N`, `aweshare hub restore --id N` — kill / revive an invite; a redeemed one carries its identity (producer or consumer) with it
 - `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
+- `aweshare producer reload` — SIGHUP the background producer to re-read config.toml + secrets.json and re-register its offerings on the open tunnel (no disconnect; a broken config keeps the previous values — check `producer doctor --status` for the log). Run it after any config edit; only `hubUrl`/`token` changes need a restart
 
 The operator owns admission and access: one-time invite codes for both roles (the only admission path; every identity carries its invite handle from mint to suspension). A redeemed consumer key may call **every** offering on the hub — there are no per-alias grants. Guardrails are all hub-side and CLI-managed: per-consumer `limits`, per-offering caps (`maxConcurrentUsers`/`dailyTokens` from the producer's config), and `revoke`/`restore` suspension. The hub CLI covers admission (`invite`), state (`list`), tuning (`limits`), metering (`usage`) and suspension (`revoke`/`restore`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too.
 
@@ -193,6 +194,7 @@ secrets.json maps `keyRef` names to upstream API keys:
 3. If the backend needs a key: add `keyRef = "name"` and the matching entry in secrets.json
 4. Append an `[[offerings]]` block mapping `namespace/alias` to the backend + upstreamModel
 5. Verify with `aweshare producer doctor`
+6. If the producer is running: `aweshare producer reload` applies the new catalog without a restart
 
 ### Verify configuration
 
@@ -204,7 +206,7 @@ aweshare producer doctor --status  # background instance state + recent log only
 
 ### Consumer Setup
 
-Redeeming an invite: `aweshare consumer join --hub https://<hub-host> --code asi_...` prints the `asc_` token once with these exact exports — tell the consumer to save it, it will not be shown again. Discovery: `aweshare consumer list --hub https://<hub-host> --token asc_...` shows every producer, alias, protocol, status and the per-offering caps (`GET /v1/catalog` under the hood). After that, consumers point a standard SDK at the hub — no special client:
+Redeeming an invite: `aweshare consumer join --hub https://<hub-host> --code asi_...` prints the `asc_` token once with these exact exports — tell the consumer to save it, it will not be shown again. Discovery: `aweshare consumer list --hub https://<hub-host> --token asc_...` shows every producer, alias, protocol, status and the per-offering caps with remaining daily tokens (`GET /v1/catalog` under the hood). After that, consumers point a standard SDK at the hub — no special client:
 
 ```bash
 # Anthropic SDK / Claude Code
@@ -236,7 +238,7 @@ docker pull ghcr.io/wehuman01/aweshare:latest    # or plain docker: stop/rm + re
 
 Rules of thumb:
 - Update the hub first (it is the public entry point), then producer agents. Agents redial automatically after a hub restart (reverse tunnel, latest-wins); consumers see 503 only during the brief restart window.
-- A running `aweshare producer start` does not hot-reload — restart it after updating the CLI on that machine (background instances: `producer stop`, then `start --background` again).
+- Config changes hot-reload — no restart: producer offerings/caps/secrets via `aweshare producer reload` (SIGHUP; re-registers on the open tunnel, a broken config keeps the previous values), hub tunables via `kill -HUP` / `docker kill -s HUP` (everything except host/port; env-pinned keys ignore the reload). Restart is still needed for CLI updates on that machine (background instances: `producer stop`, then `start --background` again) and for connection identity (`hubUrl`/`token`, host/port).
 - The CLI prints a passive update reminder at most once per 24h; disable with `AWESHARE_NO_UPDATE_CHECK=1`.
 
 If the installed `aweshare` doesn't match what the user expects from the repository:

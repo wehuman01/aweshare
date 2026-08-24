@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-08-24
+
+### Added
+
+- **Hot config reload for hub and producer** — editing `config.toml` no longer needs a restart: both processes stat-poll their config files every 2s (polling, not inotify, so edits on Docker bind mounts and network volumes are seen too) and apply valid changes within a couple of seconds; `aweshare producer reload` (or SIGHUP to either process) forces it immediately and only skips the polling delay. The producer re-reads `config.toml` + `secrets.json` and re-registers its offerings on the open tunnel — no disconnect; the hub live-applies its tunables (`consumerRps`, timeouts, `maxProducers`, …). A broken file keeps the previous values and logs the error; host/port still need a restart.
+
+### Changed
+
+- **`GET /v1/catalog` now reports `usedDailyTokens`** — consumers can see how many tokens each offering has consumed today and infer the remaining budget (`dailyTokens - usedDailyTokens`, or ∞ when unlimited). `aweshare consumer list` renders this as a `REMAINING` column. `--json` includes `usedDailyTokens` on every offering row.
+
+### Fixed
+
+- `producer start --background` now records the log file position and polls for up to 2s: an instantly dying child prints its last log lines instead of silently succeeding, and healthy starts return as soon as the first line lands.
+
 ## [0.4.1] - 2026-08-24
 
 ### Added

@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.1-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.2-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -266,7 +266,7 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 |---|---|
 | `POST /v1/chat/completions` · `POST /v1/messages` · `POST /v1/responses` | inference (Bearer or `x-api-key`) |
 | `GET /v1/models` | every alias registered on the hub, with status |
-| `GET /v1/catalog` | every offering on the hub — producer, alias, protocol, status, the per-offering caps (discovery view for `aweshare consumer list`) |
+| `GET /v1/catalog` | every offering on the hub — producer, alias, protocol, status, the per-offering caps and today's used/remaining tokens (discovery view for `aweshare consumer list`) |
 | `GET /healthz` | liveness |
 | `/admin/v1/*` | token/limit/usage management (admin or producer token) · consumer limit overrides: `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits` (admin only) |
 
@@ -303,6 +303,7 @@ Token issuance runs through invites (both roles). `limits` and `usage` are thin 
 | `aweshare producer config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
 | `aweshare producer doctor [--status]` | diagnose end to end: background instance, config, backend probes, hub, recent log (`--status` skips the network probes for an instant answer) |
 | `aweshare producer start [--background]` | connect and relay (long-running; `--background` detaches it — logs to `~/.aweshare/producer.log`, pid to `producer.pid`) |
+| `aweshare producer reload` | signal the background producer (SIGHUP) to re-read `config.toml` + `secrets.json` and re-register its offerings on the open tunnel — no disconnect; a broken config keeps the previous values |
 | `aweshare producer stop` | stop the background producer (SIGTERM, SIGKILL after 10s) and clean up its pidfile |
 
 **Consumer** — two commands, on the consumer's machine; day-to-day they point a standard SDK at the hub (see Consumer tool configuration):
@@ -310,7 +311,7 @@ Token issuance runs through invites (both roles). `limits` and `usage` are thin 
 | Command | Purpose |
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it; the operator can re-view it with `hub list --token`) |
-| `aweshare consumer list --hub URL --token asc_… [--json]` | discovery view of the hub: every producer, alias, protocol, status, the per-offering caps |
+| `aweshare consumer list --hub URL --token asc_… [--json]` | discovery view of the hub: every producer, alias, protocol, status, the per-offering caps and remaining daily tokens |
 
 CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
 
@@ -319,6 +320,8 @@ CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI 
 No always-on box to share from, or looking for models others share? The project's developer runs a community hub at **https://aweshare.wehuman.top** (invite-based — request a code at peng@wehuman.top); [docs/community-hub/](./docs/community-hub/README.md) is a step-by-step guide for connecting as a producer or consumer (中文版).
 
 The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Docker: `/data/config.toml`). `aweshare hub init` writes the template with every key commented out — uncomment to override a default. Keys use the same names as below, camelCase (`consumerRps`, `headTimeoutMs`, …). Precedence: `serve` flags (`--host`/`--port`) > env vars > config.toml > defaults. A broken file (invalid TOML, unknown key, non-positive value) fails fast at startup with the key named; `AWESHARE_HUB_DATA_DIR` itself stays env-only (it locates the file).
+
+**Hot reload:** every tunable in the table except host/port applies live on `SIGHUP` (`kill -HUP <pid>`; Docker: `docker kill -s HUP aweshare-hub`) — the new file is validated first, and a broken edit is logged while the previous values keep serving. Env vars are fixed at process start, so keys pinned by `AWESHARE_*` ignore the reloaded file (same precedence as startup); host/port need a restart. Producer-side offerings and caps reload via `aweshare producer reload`.
 
 | Env var | Default | Purpose |
 |---|---|---|
