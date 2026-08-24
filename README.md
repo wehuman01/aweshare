@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.3-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.4-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -234,7 +234,7 @@ One offering exposes exactly one upstream model: consumers call the alias and th
 | `maxConcurrentUsers` | 3 | distinct consumers with a request in flight on this alias | 429 `PRODUCER_MAX_USERS` |
 | `dailyTokens` | 1000000 | tokens (prompt + completion) shared across all consumers on this alias, per UTC day; `0` = unlimited | 429 `QUOTA_EXCEEDED` (resets at UTC midnight) |
 
-`maxConcurrencyPerUser` caps each consumer's in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a consumer firing 5 parallel requests needs `maxConcurrencyPerUser ≥ 5` for itself alone, while the total on the alias is bounded by `maxConcurrentUsers × maxConcurrencyPerUser`. Daily caps count recorded usage (see "Honest limits" below). (Renamed in v0.5 from `maxConcurrency`, which capped the alias's total in-flight requests.)
+`maxConcurrencyPerUser` caps each consumer's in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a consumer firing 5 parallel requests needs `maxConcurrencyPerUser ≥ 5` for itself alone, while the total on the alias is bounded by `maxConcurrentUsers × maxConcurrencyPerUser`. Daily caps count recorded usage (see "Honest limits" below). (Renamed in v0.4.3 from `maxConcurrency`, which capped the alias's total in-flight requests.)
 
 Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; keep `secrets.json` at 0600 and out of git/screenshots; rotate on suspected leaks. Before sharing, check the upstream's terms: account rules, subscription limits, forwarding and commercial-use constraints.
 
@@ -269,6 +269,7 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 | `GET /v1/models` | every alias registered on the hub, with status |
 | `GET /v1/catalog` | every offering on the hub — producer, alias, protocol, status, the per-offering caps and today's used/remaining tokens (discovery view for `aweshare consumer list`) |
 | `GET /healthz` | liveness |
+| `GET /admin/v1/offerings` | registered offerings with live status, caps and today's used tokens — admin sees everything, a producer token only its own slice (`aweshare producer list`) |
 | `/admin/v1/*` | token/limit/usage management (admin or producer token) · consumer limit overrides: `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits` (admin only) |
 
 Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`PRODUCER_MAX_USERS` = distinct-consumer cap; `QUOTA_EXCEEDED` = lifetime or daily token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
@@ -302,7 +303,8 @@ Token issuance runs through invites (both roles). `limits` and `usage` are thin 
 | `aweshare producer init [--hub URL] [--token asp_…]` | write config templates into `~/.aweshare` |
 | `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | redeem an invite code into a producer token and write it into the config (`--name`/`--email` for unbound codes; probes the hub first — plain HTTP outside the LAN needs `--allow-http`) |
 | `aweshare producer config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
-| `aweshare producer doctor [--status]` | diagnose end to end: background instance, config, backend probes, hub, recent log (`--status` skips the network probes for an instant answer) |
+| `aweshare producer doctor [--status]` | diagnose end to end: background instance, config, backend probes, hub (including how many of your offerings are registered), recent log (`--status` skips the network probes for an instant answer) |
+| `aweshare producer list [--json]` | what this producer has registered on the hub — alias, protocol, live status, caps, today's token use — plus the local background instance state and drift against config.toml (hubUrl/token come from config.toml) |
 | `aweshare producer start [--background]` | connect and relay (long-running; `--background` detaches it — logs to `~/.aweshare/producer.log`, pid to `producer.pid`) |
 | `aweshare producer reload` | signal the background producer (SIGHUP) to re-read `config.toml` + `secrets.json` and re-register its offerings on the open tunnel — no disconnect; a broken config keeps the previous values |
 | `aweshare producer stop` | stop the background producer (SIGTERM, SIGKILL after 10s) and clean up its pidfile |

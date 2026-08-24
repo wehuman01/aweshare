@@ -5,13 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-08-25
+
+### Added
+
+- **`aweshare producer list [--json]` and `GET /admin/v1/offerings`** — producers can finally see what the hub actually carries under their name: alias, protocol, live status, per-offering caps and today's token use, plus the local background instance state and drift against `config.toml` (a configured alias the hub rejected — e.g. alias taken — is named instead of dying in producer.log). The endpoint follows the `/admin/v1/usage` slice semantics: admin sees every producer's registrations, a producer key only its own. `producer doctor`'s hub check now also reports `N/M offering(s) registered` and the missing aliases.
+- **Multi-protocol offerings** — one alias can now speak several wire protocols at once: registrations are keyed by `(alias, protocol)` (schema v11 migrates the offerings table), consumers route to the row matching the protocol they called with, and bare aliases are auto-prefixed with the producer namespace on register. A new `backends = [...]` list on an offering expands into one registration per backend (backends sharing a protocol are rejected); agent and consumer tables merge multi-protocol aliases into a single row (protocols joined with `, `, differing values with `/`).
+
 ## [0.4.3] - 2026-08-24
 
 ### Changed
 
 - **`aweshare hub invite` now defaults `--expires-in` to 7d** — an unexpiring one-time secret was the silent default before; codes now live 7 days unless the operator spells another duration (`90s/30m/12h/7d`). The admin REST API is unchanged: omitting `expiresAt` there still mints a code with no expiry, for operators who deliberately want one.
 
-- **`aweshare consumer list` now shows both per-offering concurrency caps** — the `USERS` column is renamed `MAX USERS` (still `maxConcurrentUsers`, the distinct-consumer cap) and a new `PER USER` column shows `maxConcurrencyPerUser` (concurrent requests per consumer; `-` on pre-v0.5 hubs that don't report it). `--json` already included both fields.
+- **`aweshare consumer list` now shows both per-offering concurrency caps** — the `USERS` column is renamed `MAX USERS` (still `maxConcurrentUsers`, the distinct-consumer cap) and a new `PER USER` column shows `maxConcurrencyPerUser` (concurrent requests per consumer; `-` on pre-v0.4.3 hubs that don't report it). `--json` already included both fields.
 
 - **`maxConcurrency` is now `maxConcurrencyPerUser`** (breaking, wire v2) — the per-offering concurrency cap is now per **consumer** instead of per alias: a user hitting their own cap gets 429 `PRODUCER_MAX_CONCURRENCY` while other consumers proceed unaffected; the alias-wide bound becomes `maxConcurrentUsers × maxConcurrencyPerUser`. Renamed everywhere: config key, register message, DB column (`offerings.max_concurrency` → `max_concurrency_per_user`, schema v10), catalog field. A config still using the old `maxConcurrency` key fails validation with a rename hint. WIRE_VERSION bumped to 2 — mixed old/new hub+agent pairs refuse to pair with a clear mismatch error instead of silently applying default caps.
 

@@ -59,7 +59,7 @@ keyRef = "stepfun-key"
 alias = "peng1/step-flash"         # namespace must match your producer name
 backend = "stepfun"
 upstreamModel = "step-3.7-flash"
-maxConcurrency = 2
+maxConcurrencyPerUser = 2          # concurrent requests per consumer
 ```
 
 Put the actual key in `secrets.json` — it never leaves this machine:
@@ -114,7 +114,7 @@ Then point any tool that accepts a custom OpenAI/Anthropic base URL at the hub a
 
 ## Caps and fair use
 
-Per-offering guardrails are set by the producer (`maxConcurrency`, distinct concurrent consumers, daily token budget and remaining — visible in `consumer list`). The hub also applies global admission limits (producers are capped, currently 10) and rate limiting. Hit a cap and the 429 error names it.
+Per-offering guardrails are set by the producer (`maxConcurrencyPerUser` — concurrent requests per consumer, `maxConcurrentUsers` — distinct concurrent consumers, daily token budget and remaining — visible in `consumer list`). The hub also applies global admission limits (producers are capped, currently 10) and rate limiting. Hit a cap and the 429 error names it.
 
 ## FAQ
 

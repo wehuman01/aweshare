@@ -1,5 +1,7 @@
 # aweshare: I Let My Agent Share My GPU
 
+> Historical article, written against the v0.3.x CLI. Since then: per-alias grants were removed in v0.4.0 (any admitted consumer may call every offering), and `aweshare agent …` became `aweshare producer …` — the workflow below is kept as published.
+
 ![aweshare](../../logo/logo.png)
 
 Here is the uncomfortable math of being the one person in the group with a GPU: you have a 4090 sitting in the corner running Ollama, you have API keys for models your friends can't reach, and every conversation ends with "can you run this prompt for me?" You become a human relay. Copy, paste, wait, paste back. It is the least interesting kind of work, and it scales to exactly one person.

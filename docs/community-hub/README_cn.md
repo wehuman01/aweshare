@@ -59,7 +59,7 @@ keyRef = "stepfun-key"
 alias = "peng1/step-flash"         # 命名空间必须等于你的生产者名
 backend = "stepfun"
 upstreamModel = "step-3.7-flash"
-maxConcurrency = 2
+maxConcurrencyPerUser = 2          # 每个消费者的并发请求数
 ```
 
 真正的 key 放进 `secrets.json`——它不会离开这台机器：
@@ -114,7 +114,7 @@ curl https://aweshare.wehuman.top/v1/chat/completions \
 
 ## 配额与公平使用
 
-单模型的护栏由生产者设定（`maxConcurrency`、并发消费者数、每日 token 预算及剩余——`consumer list` 里可见）。hub 另有全局准入上限（生产者名额当前 10 个）和限流。触顶时 429 报错会写明原因。
+单模型的护栏由生产者设定（`maxConcurrencyPerUser`——每个消费者的并发请求数、`maxConcurrentUsers`——并发消费者数、每日 token 预算及剩余——`consumer list` 里可见）。hub 另有全局准入上限（生产者名额当前 10 个）和限流。触顶时 429 报错会写明原因。
 
 ## 常见问题
 

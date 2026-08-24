@@ -27,7 +27,7 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]` — show (bare), merge or clear one consumer's limit overrides
 - `aweshare hub revoke --id N`, `aweshare hub restore --id N` — kill / revive an invite; a redeemed one carries its identity (producer or consumer) with it
 - `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
-- `aweshare producer reload` — SIGHUP the background producer to re-read config.toml + secrets.json and re-register its offerings on the open tunnel (no disconnect; a broken config keeps the previous values — check `producer doctor --status` for the log). Run it after any config edit; only `hubUrl`/`token` changes need a restart
+- `aweshare producer reload` — re-read config.toml + secrets.json and re-register the offerings on the open tunnel (no disconnect; a broken config keeps the previous values — check `producer doctor --status` for the log). Since v0.4.2 both processes stat-poll their config every 2s and apply valid edits automatically — `reload`/SIGHUP just skips that delay; only `hubUrl`/`token` changes need a restart
 
 The operator owns admission and access: one-time invite codes for both roles (the only admission path; every identity carries its invite handle from mint to suspension). A redeemed consumer key may call **every** offering on the hub — there are no per-alias grants. Guardrails are all hub-side and CLI-managed: per-consumer `limits`, per-offering caps (`maxConcurrentUsers`/`dailyTokens` from the producer's config), and `revoke`/`restore` suspension. The hub CLI covers admission (`invite`), state (`list`), tuning (`limits`), metering (`usage`) and suspension (`revoke`/`restore`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too.
 
@@ -157,7 +157,7 @@ keyRef = "glm-key"
 alias = "YOUR_NAME/qwen2.5.7b"           # namespace/name, lowercase, globally unique
 backend = "ollama"                       # must match a backends.id
 upstreamModel = "qwen2.5:7b"             # exact id the backend knows (incl. tag)
-maxConcurrency = 1                       # 1..64 — in-flight REQUEST cap
+maxConcurrencyPerUser = 1                # concurrent requests PER CONSUMER (1..64)
 # maxConcurrentUsers = 3                 # distinct concurrent CONSUMERS (hub default 3)
 # dailyTokens = 1000000                  # shared tokens per UTC day (default 1M; 0 = unlimited)
 ```
@@ -171,7 +171,7 @@ secrets.json maps `keyRef` names to upstream API keys:
 **Rules:**
 - The namespace in every alias must match the producer name the token was issued for.
 - One offering = exactly one upstream model: the hub rewrites the request's model to `upstreamModel`, so consumers can never pick another. More models = more `[[offerings]]`.
-- Per-offering caps (`maxConcurrentUsers`, default 3; `dailyTokens`, default 1M, 0 = unlimited) ride the register message and are enforced by the hub — 429 `PRODUCER_MAX_USERS` / `QUOTA_EXCEEDED` (UTC-midnight reset). They apply by default to every alias, including old agents that don't send them.
+- Per-offering caps ride the register message and are enforced by the hub — `maxConcurrencyPerUser` (default 1, concurrent requests **per consumer**; alias-wide bound is `maxConcurrentUsers × maxConcurrencyPerUser`) → 429 `PRODUCER_MAX_CONCURRENCY`; `maxConcurrentUsers` (default 3) → 429 `PRODUCER_MAX_USERS`; `dailyTokens` (default 1M, 0 = unlimited) → 429 `QUOTA_EXCEEDED` (UTC-midnight reset). They apply by default to every alias, including old agents that don't send them. The old `maxConcurrency` key (alias-wide cap, pre-v0.4.3) fails validation with a rename hint.
 - Upstream keys live only in secrets.json on the producer's machine — never in config.toml, never in chat output.
 - `anthropic`-protocol baseUrl excludes `/v1` (the agent appends it); `openai`-protocol baseUrl includes `/v1`; `responses`-protocol baseUrl includes the version path (e.g. `https://open.bigmodel.cn/api/v1`).
 - An alias speaks exactly one wire protocol — there is no cross-protocol conversion.
@@ -238,7 +238,7 @@ docker pull ghcr.io/wehuman01/aweshare:latest    # or plain docker: stop/rm + re
 
 Rules of thumb:
 - Update the hub first (it is the public entry point), then producer agents. Agents redial automatically after a hub restart (reverse tunnel, latest-wins); consumers see 503 only during the brief restart window.
-- Config changes hot-reload — no restart: producer offerings/caps/secrets via `aweshare producer reload` (SIGHUP; re-registers on the open tunnel, a broken config keeps the previous values), hub tunables via `kill -HUP` / `docker kill -s HUP` (everything except host/port; env-pinned keys ignore the reload). Restart is still needed for CLI updates on that machine (background instances: `producer stop`, then `start --background` again) and for connection identity (`hubUrl`/`token`, host/port).
+- Config changes hot-reload — no restart: both processes stat-poll their config files every 2s and apply valid edits within a couple of seconds; `aweshare producer reload` (SIGHUP to either process) forces it immediately, skipping only the polling delay. A broken file keeps the previous values; host/port and connection identity (`hubUrl`/`token`) still need a restart. Restart is also needed for CLI updates on that machine (background instances: `producer stop`, then `start --background` again).
 - The CLI prints a passive update reminder at most once per 24h; disable with `AWESHARE_NO_UPDATE_CHECK=1`.
 
 If the installed `aweshare` doesn't match what the user expects from the repository:
