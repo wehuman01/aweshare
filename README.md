@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.8-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.9-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -35,7 +35,7 @@
 ```
 Consumer (standard SDK, zero changes)         Producer side
 ┌───────────────────────┐            ┌────────────────────────────┐
-│ Claude Code           │            │ aweshare agent (Node CLI)   │
+│ Claude Code           │            │ aweshare producer (Node CLI)   │
 │  ANTHROPIC_BASE_URL ──┼──► HTTPS ──┤  ~/.aweshare/config.toml   │
 │ OpenAI SDK / Codex    │            │  ~/.aweshare/secrets.json  │
 └───────────────────────┘            │   │ upstream key injection  │
@@ -97,18 +97,21 @@ aweshare hub invite --name peng [--expires-in 7d]      # → asi_..., send to th
 aweshare hub invite --count 10 [--expires-in 7d]
 
 # the producer redeems it themselves (no token hand-off needed):
-aweshare agent join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
+aweshare producer join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
-Consumers join the same way — a consumer code redeems into an `asc_` key the consumer keeps (no aweshare install needed):
+Consumers join the same way — a consumer code redeems into an `asc_` key the consumer keeps:
 
 ```bash
 aweshare hub invite --role consumer --name alice [--expires-in 7d]   # → asi_..., send to the consumer
 
-# the consumer redeems it themselves with one curl:
-curl -s -X POST https://hub.example.com/invites/v1/redeem \
-  -H 'content-type: application/json' -d '{"code":"asi_..."}'
-# → {"role":"consumer","name":"alice","token":"asc_..."} — set as the SDK API key
+# the consumer redeems it themselves (prints the asc_ token once, with the SDK
+# env vars ready to paste — save the token, it will not be shown again):
+aweshare consumer join --hub https://hub.example.com --code asi_...
+
+# no aweshare installed? one curl works too:
+# curl -s -X POST https://hub.example.com/invites/v1/redeem \
+#   -H 'content-type: application/json' -d '{"code":"asi_..."}'
 ```
 
 Prefer hand-delivering keys? Direct issuance still works via the admin API:
@@ -129,7 +132,7 @@ Three token roles, one per party:
 
 The producer's `name` becomes their alias namespace (the `peng/` in `peng/gpt-4o`).
 
-Identity and permission are deliberately split. The operator issues identities — invite codes for producers, `asc_…` keys for consumers — while each producer alone decides who may call their own aliases (`aweshare agent grant`; the admin API can read grants for audit but cannot write them). A fresh consumer key can call nothing until a producer grants it, so the hub works the same whether you run everything yourself (private hub) or producers who don't know each other share yours (community hub).
+Identity and permission are deliberately split. The operator issues identities — invite codes for producers, `asc_…` keys for consumers — while each producer alone decides who may call their own aliases (`aweshare producer grant`; the admin API can read grants for audit but cannot write them). A fresh consumer key can call nothing until a producer grants it, so the hub works the same whether you run everything yourself (private hub) or producers who don't know each other share yours (community hub).
 
 ### 2. Producer first run (in this order)
 
@@ -137,29 +140,29 @@ Identity and permission are deliberately split. The operator issues identities �
 npm install -g aweshare   # ⓪ once, on the producer machine (Node ≥ 22)
 
 # ① join with your invite code (writes ~/.aweshare/config.toml + secrets.json, 0600)
-aweshare agent join --hub https://hub.example.com --code asi_...
+aweshare producer join --hub https://hub.example.com --code asi_...
 #    or, with a producer token handed to you directly:
-aweshare agent init --hub https://hub.example.com --token asp_...
+aweshare producer init --hub https://hub.example.com --token asp_...
 
 # ② Edit the config (see below); put upstream keys in secrets.json — they never leave this machine
 
 # ③ doctor: pre-flight checks, ordered to find the first failing link
-aweshare agent doctor
+aweshare producer doctor
 
 # ④ Grant a consumer
-aweshare agent grant --alias peng/qwen2.5.7b --consumer alice
+aweshare producer grant --alias peng/qwen2.5.7b --consumer alice
 #    time-limited trial: add --expires-in 7d (re-granting refreshes the expiry)
 
 # ⑤ Start (long-running; when it stops, aliases go offline and consumers get 503)
-aweshare agent start
+aweshare producer start
 ```
 
 ### 3. Consumer first run (in this order)
 
 ```bash
 # ⓪ redeem your invite code (skip if the operator handed you an asc_ key directly)
-curl -s -X POST https://hub.example.com/invites/v1/redeem \
-  -H 'content-type: application/json' -d '{"code":"asi_..."}'   # → your asc_ token
+#    prints the token once with ready-to-paste env vars — save it, it will not be shown again
+aweshare consumer join --hub https://hub.example.com --code asi_...
 
 # ① one small curl to prove the path
 curl https://hub.example.com/v1/chat/completions \
@@ -252,7 +255,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `tpm` | max tokens (prompt + completion) in any sliding 60s window | 429 `RATE_LIMITED` (in-memory window, like the RPS bucket) |
 | `maxTotalTokens` | lifetime token budget for this consumer | 429 `QUOTA_EXCEEDED` (sums `usage_events`) |
 
-Grants can also carry an expiry: `aweshare agent grant --alias peng/gpt-4o --consumer alice --expires-in 7d`. Grant writes are producer-owned — the admin API keeps read-only audit access but rejects admin-token writes with `403 NOT_GRANTED`. An expired grant returns `403 GRANT_EXPIRED`; re-granting refreshes the expiry.
+Grants can also carry an expiry: `aweshare producer grant --alias peng/gpt-4o --consumer alice --expires-in 7d`. Grant writes are producer-owned — the admin API keeps read-only audit access but rejects admin-token writes with `403 NOT_GRANTED`. An expired grant returns `403 GRANT_EXPIRED`; re-granting refreshes the expiry.
 
 Honest limits: token-based caps count what upstreams report — Ollama streams report no usage, so they contribute 0. Both TPM and the lifetime budget are observed-usage thresholds, not hard reservations: one request can cross the threshold, and concurrent requests that start before earlier usage is recorded can overshoot it further. Once recorded usage has reached the threshold, new requests are rejected.
 
@@ -267,7 +270,7 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 
 Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403` not granted or `GRANT_EXPIRED` · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`QUOTA_EXCEEDED` = lifetime token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
 
-Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Producers list grants with `aweshare agent list`; usage is queried with `aweshare hub usage` or `GET /admin/v1/usage` (admin sees everything, producers and consumers their own slice).
+Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Producers list grants with `aweshare producer list`; usage is queried with `aweshare hub usage` or `GET /admin/v1/usage` (admin sees everything, producers and consumers their own slice).
 
 ## Command reference
 
@@ -285,30 +288,38 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | recent requests, newest first — one row per request, zero content stored |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
 
-Token issuance runs through invites (both roles). `limits` and `usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too. Grants are producer-owned and were never the operator's CLI: manage them with `aweshare agent grant`/`revoke`/`list` on the producer machine (the admin API keeps read-only audit access).
+Token issuance runs through invites (both roles). `limits` and `usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too. Grants are producer-owned and were never the operator's CLI: manage them with `aweshare producer grant`/`revoke`/`list` on the producer machine (the admin API keeps read-only audit access).
 
 `list` prints an aligned table by default; append `--json` for the raw API response.
 
-**Agent (producer)** — runs on the producer's machine (the one with the backends); consumers run no aweshare commands — they point a standard SDK at the hub (see Consumer tool configuration):
+**Producer** — runs on the producer's machine (the one with the backends):
 
 | Command | Purpose |
 |---|---|
-| `aweshare agent init [--hub URL] [--token asp_…]` | write config templates into `~/.aweshare` |
-| `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | redeem an invite code into a producer token and write it into the config (`--name`/`--email` for unbound codes; probes the hub first — plain HTTP outside the LAN needs `--allow-http`) |
-| `aweshare agent config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
-| `aweshare agent doctor` | pre-flight checks — fix the first FAIL, re-run |
-| `aweshare agent grant --alias ns/model --consumer NAME [--expires-in 7d]` | grant a consumer access |
-| `aweshare agent revoke --alias ns/model --consumer NAME` | revoke access |
-| `aweshare agent list` | list grants for your namespace |
-| `aweshare agent start` | connect and relay (long-running; run it in your own terminal) |
+| `aweshare producer init [--hub URL] [--token asp_…]` | write config templates into `~/.aweshare` |
+| `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | redeem an invite code into a producer token and write it into the config (`--name`/`--email` for unbound codes; probes the hub first — plain HTTP outside the LAN needs `--allow-http`) |
+| `aweshare producer config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
+| `aweshare producer doctor` | pre-flight checks — fix the first FAIL, re-run |
+| `aweshare producer grant --alias ns/model --consumer NAME [--expires-in 7d]` | grant a consumer access |
+| `aweshare producer revoke --alias ns/model --consumer NAME` | revoke access |
+| `aweshare producer list` | list grants for your namespace |
+| `aweshare producer start` | connect and relay (long-running; run it in your own terminal) |
+
+**Consumer** — one command, on the consumer's machine; day-to-day they point a standard SDK at the hub (see Consumer tool configuration):
+
+| Command | Purpose |
+|---|---|
+| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it: the hub stores only a hash) |
 
 CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
 
 ## Operations
 
+The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Docker: `/data/config.toml`). `aweshare hub init` writes the template with every key commented out — uncomment to override a default. Keys use the same names as below, camelCase (`consumerRps`, `headTimeoutMs`, …). Precedence: `serve` flags (`--host`/`--port`) > env vars > config.toml > defaults. A broken file (invalid TOML, unknown key, non-positive value) fails fast at startup with the key named; `AWESHARE_HUB_DATA_DIR` itself stays env-only (it locates the file).
+
 | Env var | Default | Purpose |
 |---|---|---|
-| `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | data dir (SQLite/pepper/admin token; volume-mount = backup) |
+| `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | data dir (SQLite/pepper/admin token/config.toml; volume-mount = backup) |
 | `AWESHARE_HUB_PORT` / `HOST` | 8787 / 0.0.0.0 | listen address |
 | `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | per-consumer limits |
 | `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 300000 | response-head timeout / stream idle timeout |
@@ -342,7 +353,7 @@ To run the CLIs from a source checkout without `node apps/.../dist/cli.js`, link
 ```bash
 npm link                 # or: pnpm link --global — exposes the single `aweshare` bin
 aweshare hub serve
-aweshare agent doctor
+aweshare producer doctor
 ```
 
 Releasing: push a `v*` tag with a matching `## [x.y.z]` section in `docs/CHANGELOG.md`; CI publishes the `aweshare` package to npm via Trusted Publishing (OIDC, no token secret), pushes the Docker image to `ghcr.io/wehuman01/aweshare`, and mirrors user-facing docs to the public repo (`wehuman01/aweshare`).

@@ -42,11 +42,13 @@ Node ≥ 22, pnpm ≥ 11. The layout:
 
 ```
 packages/protocol   shared wire protocol: binary frame codec, control messages,
-                    alias rules, error codes (used by both hub and agent)
+                    alias rules, error codes (used by hub, agent and consumer)
 apps/hub            node:http + ws + better-sqlite3; consumer endpoints, tunnel
                     server, admin API, aweshare hub CLI
-apps/agent          aweshare agent CLI: config/secrets, protocol adapters,
+apps/agent          aweshare producer CLI: config/secrets, protocol adapters,
                     tunnel client with reconnect, health gate, doctor
+apps/consumer       aweshare consumer CLI: invite redeem (join) that prints
+                    the asc_ token once with ready-to-paste SDK env vars
 ```
 
 ## Testing expectations

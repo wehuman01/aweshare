@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.8-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.9-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -35,7 +35,7 @@
 ```
 消费者（标准 SDK，零改动）                 生产者侧
 ┌───────────────────────┐            ┌────────────────────────────┐
-│ Claude Code           │            │ aweshare agent (Node CLI)   │
+│ Claude Code           │            │ aweshare producer (Node CLI)   │
 │  ANTHROPIC_BASE_URL ──┼──► HTTPS ──┤  ~/.aweshare/config.toml   │
 │ OpenAI SDK / Codex    │            │  ~/.aweshare/secrets.json  │
 └───────────────────────┘            │   │ 注入上游 Key（唯一位置） │
@@ -97,18 +97,20 @@ aweshare hub invite --name peng [--expires-in 7d]      # → asi_...，发给生
 aweshare hub invite --count 10 [--expires-in 7d]
 
 # 生产者自行兑换（不需要传递令牌本身）：
-aweshare agent join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
+aweshare producer join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 ```
 
-消费者以同样方式加入——consumer 邀请码兑换后得到消费者自己保管的 `asc_` 密钥（无需安装 aweshare）：
+消费者以同样方式加入——consumer 邀请码兑换后得到消费者自己保管的 `asc_` 密钥：
 
 ```bash
 aweshare hub invite --role consumer --name alice [--expires-in 7d]   # → asi_...，发给消费者
 
-# 消费者自己用一条 curl 兑换：
-curl -s -X POST https://hub.example.com/invites/v1/redeem \
-  -H 'content-type: application/json' -d '{"code":"asi_..."}'
-# → {"role":"consumer","name":"alice","token":"asc_..."} —— 填进 SDK 的 API key
+# 消费者自己兑换（asc_ 只打印一次，附可直接粘贴的 SDK 环境变量——当场保存，之后不再显示）：
+aweshare consumer join --hub https://hub.example.com --code asi_...
+
+# 没装 aweshare？一条 curl 也行：
+# curl -s -X POST https://hub.example.com/invites/v1/redeem \
+#   -H 'content-type: application/json' -d '{"code":"asi_..."}'
 ```
 
 想直接递密钥也行——admin API 直发仍然可用：
@@ -129,7 +131,7 @@ curl -X POST https://hub.example.com/admin/v1/tokens \
 
 `name` 即生产者的别名命名空间（`peng/gpt-4o` 的 `peng/`）。
 
-**身份与权限刻意分离**：运营者只发身份——生产者的邀请码、消费者的 `asc_…` 密钥；谁能调用哪个别名，由该生产者一人决定（`aweshare agent grant`；admin API 对授权只保留只读审计，写入会被拒绝）。刚领的消费者密钥在被授权之前什么都调不了——私有 hub（全是你自己的机器）和社区 hub（互不隶属的生产者共享你的 hub）因此用同一套规则运转。
+**身份与权限刻意分离**：运营者只发身份——生产者的邀请码、消费者的 `asc_…` 密钥；谁能调用哪个别名，由该生产者一人决定（`aweshare producer grant`；admin API 对授权只保留只读审计，写入会被拒绝）。刚领的消费者密钥在被授权之前什么都调不了——私有 hub（全是你自己的机器）和社区 hub（互不隶属的生产者共享你的 hub）因此用同一套规则运转。
 
 ### 2. 生产者首跑（按顺序）
 
@@ -137,29 +139,29 @@ curl -X POST https://hub.example.com/admin/v1/tokens \
 npm install -g aweshare   # ⓪ 生产者机器上装一次（Node ≥ 22）
 
 # ① join：用邀请码兑换（生成 ~/.aweshare/config.toml + secrets.json，0600）
-aweshare agent join --hub https://hub.example.com --code asi_...
+aweshare producer join --hub https://hub.example.com --code asi_...
 #    或拿到现成令牌时：
-aweshare agent init --hub https://hub.example.com --token asp_...
+aweshare producer init --hub https://hub.example.com --token asp_...
 
 # ② 编辑配置（见下文），把上游 key 放进 secrets.json —— 它们不会离开这台机器
 
 # ③ doctor：预检，按「先找第一个失败环节」的顺序
-aweshare agent doctor
+aweshare producer doctor
 
 # ④ 授权消费者
-aweshare agent grant --alias peng/qwen2.5.7b --consumer alice
+aweshare producer grant --alias peng/qwen2.5.7b --consumer alice
 #    限时试用：加 --expires-in 7d（重复授权会刷新到期时间）
 
 # ⑤ 启动（长驻进程；停止即别名下线，消费者会收到 503）
-aweshare agent start
+aweshare producer start
 ```
 
 ### 3. 消费者首跑（按顺序）
 
 ```bash
 # ⓪ 兑换你的邀请码（操作者直接给 asc_ 密钥的可跳过）
-curl -s -X POST https://hub.example.com/invites/v1/redeem \
-  -H 'content-type: application/json' -d '{"code":"asi_..."}'   # → 你的 asc_ 密钥
+#    令牌只打印一次并附可直接粘贴的环境变量——当场保存，之后不再显示
+aweshare consumer join --hub https://hub.example.com --code asi_...
 
 # ① curl 一发小请求确认链路
 curl https://hub.example.com/v1/chat/completions \
@@ -252,7 +254,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `tpm` | 任意滑动 60 秒窗口内的 token 上限（prompt + completion） | 429 `RATE_LIMITED`（内存窗口，与 RPS 桶一致） |
 | `maxTotalTokens` | 该消费者的终身 token 预算 | 429 `QUOTA_EXCEEDED`（对 `usage_events` 求和） |
 
-授权可带有效期：`aweshare agent grant --alias peng/gpt-4o --consumer alice --expires-in 7d`。授权写入是生产者专属——admin API 只保留只读审计，admin 令牌写入会得到 `403 NOT_GRANTED`。过期授权返回 `403 GRANT_EXPIRED`；重新授权会刷新到期时间。
+授权可带有效期：`aweshare producer grant --alias peng/gpt-4o --consumer alice --expires-in 7d`。授权写入是生产者专属——admin API 只保留只读审计，admin 令牌写入会得到 `403 NOT_GRANTED`。过期授权返回 `403 GRANT_EXPIRED`；重新授权会刷新到期时间。
 
 诚实的限制说明：token 类上限只统计上游报告的用量——Ollama 流式响应不带 usage，按 0 计。TPM 和终身预算都是基于已观测用量的阈值，不是预留式硬上限：单个请求可能跨过阈值，先于已有请求用量落库的并发请求还会进一步超额；已记录用量达到阈值后，新请求才会被拒绝。
 
@@ -267,7 +269,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 
 错误语义：`401` 无效密钥 · `401 TOKEN_REVOKED` 令牌被挂起（请联系运维者 restore） · `403` 未获授权或授权已过期（`GRANT_EXPIRED`） · `403 HUB_FULL` 生产者容量已满 · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`QUOTA_EXCEEDED` = 终身 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
 
-用量记录：每请求一行（别名、真实模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。生产者 `aweshare agent list` 查看授权；用量用 `aweshare hub usage` 或 `GET /admin/v1/usage` 查询（admin 全量，生产者/消费者各看自己那份）。
+用量记录：每请求一行（别名、真实模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。生产者 `aweshare producer list` 查看授权；用量用 `aweshare hub usage` 或 `GET /admin/v1/usage` 查询（admin 全量，生产者/消费者各看自己那份）。
 
 ## 常用命令
 
@@ -285,30 +287,38 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | 最近请求用量，新在前——每请求一行，内容零落库 |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
 
-令牌签发统一走邀请码（两种角色）。`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。授权归生产者所有，从来不在运营者的 CLI 上：在生产者机器上用 `aweshare agent grant`/`revoke`/`list` 管理（admin API 保留只读审计）。
+令牌签发统一走邀请码（两种角色）。`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。授权归生产者所有，从来不在运营者的 CLI 上：在生产者机器上用 `aweshare producer grant`/`revoke`/`list` 管理（admin API 保留只读审计）。
 
 list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 
-**Agent（生产者侧）**——运行在生产者（即带后端）的那台机器上；消费者不运行任何 aweshare 命令，标准 SDK 直连 hub 即可（见「消费工具配置」）：
+**生产者侧**——运行在生产者（即带后端）的那台机器上：
 
 | 命令 | 用途 |
 |---|---|
-| `aweshare agent init [--hub URL] [--token asp_…]` | 写入 `~/.aweshare` 配置模板 |
-| `aweshare agent join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | 兑换邀请码得到 producer 令牌并写入配置（不绑定码需 `--name`/`--email`；先探测 hub——局域网以外的明文 HTTP 需 `--allow-http`） |
-| `aweshare agent config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
-| `aweshare agent doctor` | 预检——修好第一个 FAIL 再重跑 |
-| `aweshare agent grant --alias ns/model --consumer NAME [--expires-in 7d]` | 授权消费者 |
-| `aweshare agent revoke --alias ns/model --consumer NAME` | 取消授权 |
-| `aweshare agent list` | 列出你命名空间下的授权 |
-| `aweshare agent start` | 连接并转发（长驻进程，在自己终端里跑） |
+| `aweshare producer init [--hub URL] [--token asp_…]` | 写入 `~/.aweshare` 配置模板 |
+| `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | 兑换邀请码得到 producer 令牌并写入配置（不绑定码需 `--name`/`--email`；先探测 hub——局域网以外的明文 HTTP 需 `--allow-http`） |
+| `aweshare producer config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
+| `aweshare producer doctor` | 预检——修好第一个 FAIL 再重跑 |
+| `aweshare producer grant --alias ns/model --consumer NAME [--expires-in 7d]` | 授权消费者 |
+| `aweshare producer revoke --alias ns/model --consumer NAME` | 取消授权 |
+| `aweshare producer list` | 列出你命名空间下的授权 |
+| `aweshare producer start` | 连接并转发（长驻进程，在自己终端里跑） |
+
+**消费者侧**——只有一条命令，跑在消费者机器上；日常使用时标准 SDK 直连 hub（见「消费工具配置」）：
+
+| 命令 | 用途 |
+|---|---|
+| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存：hub 只存哈希） |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 
 ## 运维
 
+hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Docker 内是 `/data/config.toml`）。`aweshare hub init` 会生成模板，全部键注释着——取消注释即覆盖默认值。键名与下表同义、用 camelCase（`consumerRps`、`headTimeoutMs`…）。优先级：`serve` 参数（`--host`/`--port`）> 环境变量 > config.toml > 默认值。文件有问题（非法 TOML、未知键、非正数值）启动即报错并指名键；`AWESHARE_HUB_DATA_DIR` 本身只能用环境变量（它决定文件在哪）。
+
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
-| `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | 数据目录（SQLite/pepper/admin token，挂卷即备份） |
+| `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | 数据目录（SQLite/pepper/admin token/config.toml，挂卷即备份） |
 | `AWESHARE_HUB_PORT` / `HOST` | 8787 / 0.0.0.0 | 监听 |
 | `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | 每消费者限流 |
 | `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 300000 | 响应头超时 / 流空闲超时 |
@@ -342,7 +352,7 @@ pnpm check       # biome
 ```bash
 npm link                 # 或 pnpm link --global——只安装唯一的 `aweshare` 命令
 aweshare hub serve
-aweshare agent doctor
+aweshare producer doctor
 ```
 
 发布：push 一个 `v*` tag（`docs/CHANGELOG.md` 需有对应 `## [x.y.z]` 小节），CI 通过 Trusted Publishing（OIDC，无需 token secret）自动发布 `aweshare` 到 npm，推送 Docker 镜像到 `ghcr.io/wehuman01/aweshare`，并将用户文档同步到公开仓库 wehuman01/aweshare。

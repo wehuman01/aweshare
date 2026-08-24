@@ -3,6 +3,20 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.3.9] - 2026-08-24
+
+### Changed
+
+- **`aweshare agent` is now `aweshare producer`** — the command group now carries the role it serves, matching the `hub`/`producer`/`consumer` triple and the `asp_`/`asc_` token prefixes. Every subcommand keeps its name and behavior (`init`, `join`, `config`, `doctor`, `start`, `grant`, `revoke`, `list`). **Breaking:** the old `agent` target is gone without an alias — scripts must switch to `aweshare producer ...`. Internal names are untouched: the config dir stays `~/.aweshare`, the env var stays `AWESHARE_AGENT_DIR`, and the directory/package stay `apps/agent`/`@aweshare/agent`.
+- Retired hub subcommands (`hub token`, `hub grant`, `hub consumer`) no longer get pointer errors — they fail as unknown commands like anything else unrecognized.
+- `INVITE_ROLE_MISMATCH` now points at the right command for both directions (`use 'aweshare <role> join' with this code`), and the `hub invite --role consumer` handout leads with `aweshare consumer join` (curl stays as the no-install fallback).
+
+### Added
+
+- **Hub `config.toml`** — the hub now reads `<dataDir>/config.toml` (`~/.aweshare-hub/`; Docker `/data/`), so tuning no longer requires env vars. `hub init` writes the template with every key commented out (uncomment to override); keys mirror the env vars in camelCase (`consumerRps`, `headTimeoutMs`, …). Precedence: `serve` flags > env vars > config.toml > defaults — existing env-only deployments behave identically. A broken file (invalid TOML, unknown key, non-positive value) fails fast at startup with the key named; `AWESHARE_HUB_DATA_DIR` stays env-only (it locates the file).
+- **`aweshare consumer join --hub URL --code asi_... [--allow-http]`** — consumers redeem their invite with the CLI instead of curl: probes the hub first (the code only burns after the probe passes), asserts the consumer role (a producer code rejects with 409 without being burned), then prints the `asc_` token once with ready-to-paste `OPENAI_*` / `ANTHROPIC_*` exports. Consumers keep no local files — the token lives in their SDK environment.
+- Token outputs now tell you to save them: `consumer join` prints a "will not be shown again" warning under the token (the hub stores only a hash), and the `producer join` failure path that hands over the `asp_` token says the same. `hub init` (admin token) and `hub invite` (codes) already did.
+
 ## [0.3.8] - 2026-08-23
 
 ### Added
