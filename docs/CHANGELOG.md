@@ -3,6 +3,27 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [Unreleased]
+
+## [0.4.0] - 2026-08-24
+
+### Removed
+
+- **Breaking: per-alias grants.** The producer-side grant business is gone — admission (the operator's one-time invite codes) plus the existing guardrails (per-consumer `hub limits`, per-offering `maxConcurrentUsers`/`dailyTokens` caps, `hub revoke` suspension) fully replace it. A redeemed consumer key may call **every** offering on the hub; if the operator lets someone in, they can use what is shared. Removed: `aweshare producer grant`/`revoke`/`list`, `PUT`/`DELETE`/`GET /admin/v1/grants`, the `NOT_GRANTED`/`GRANT_EXPIRED` error codes, the catalog's `granted` flag (schema v8 drops the `grants` table on upgrade), and the grants-only GRANTED column in `aweshare consumer list`. `GET /v1/models` now lists every registered alias. Producers lose nothing else: their connection is the tunnel, and `GET /admin/v1/usage` still answers producer tokens (own slice). **Before upgrading a shared hub, decide whether every admitted consumer may use every offering** — on a private hub this is usually already true.
+- **Breaking: direct admin-API token issuance.** `POST /admin/v1/tokens`, `DELETE /admin/v1/tokens/{producers|consumers}/{id}` and its `/restore` are gone — admission and suspension are invite-only (`hub invite` + the public redeem endpoint; `hub revoke --id N` / `hub restore --id N`). The mint route duplicated what any admin-token holder could already do in two calls (create an invite, redeem it) while bypassing the lifecycle handle: identities it minted had no invite row, so `hub revoke` — the CLI's only suspension tool — could not touch them. Every identity now provably carries an invite handle from mint to suspension. `GET /admin/v1/tokens` stays (the `hub list producers`/`hub list consumers` rosters read it). Hubs holding identities minted by the old route should re-admit them via invites before upgrading — those identities lose their suspension handle otherwise.
+
+## [0.3.10] - 2026-08-24
+
+### Added
+
+- **Per-offering usage caps** — `maxConcurrentUsers` (distinct consumers with a request in flight; hub default 3, 429 `PRODUCER_MAX_USERS`) and `dailyTokens` (tokens shared across all consumers per alias per UTC day; hub default 1,000,000, `0` = unlimited, 429 `QUOTA_EXCEEDED` with UTC-midnight reset) are optional keys on every `[[offerings]]`. They ride the register message to the hub (schema v7), which enforces them at dispatch. `maxConcurrency` caps in-flight requests; `maxConcurrentUsers` caps in-flight people — one consumer firing parallel requests still counts as one user. **Behavior change:** the defaults apply to every alias once the hub upgrades, including offerings whose agent predates these fields — raise them or set `dailyTokens = 0` in the producer's config.toml to relax. Daily caps count recorded usage (Ollama streams report none), so they are observed-usage thresholds like the existing token budgets.
+- **`GET /v1/catalog`** (consumer key) — every offering on the hub: producer, alias, protocol, status, the caller's grant flag and the per-offering caps. A discovery view for consumers deciding what to ask for; `/v1/models` keeps its OpenAI shape.
+- **`aweshare consumer list --hub URL --token asc_... [--json]`** — renders the catalog as an aligned table (PRODUCER/ALIAS/PROTOCOL/STATUS/GRANTED/USERS/DAILY TOKENS).
+
+### Fixed
+
+- Schema v7 migration also creates `offerings`/`usage_events` for databases upgraded all the way from v1 — those tables previously only existed if the database was created fresh, leaving upgraded v1 databases without them.
+
 ## [0.3.9] - 2026-08-24
 
 ### Changed

@@ -1,11 +1,11 @@
 ---
 name: aweshare
-description: "Use when helping users configure or operate aweshare — producer agent setup (backends, offerings, secrets), hub admin (tokens, grants, limits, usage), and consumer SDK wiring. 中文触发词：aweshare、共享模型、配置agent、grant授权、hub管理、consumer接入。"
+description: "Use when helping users configure or operate aweshare — producer agent setup (backends, offerings, secrets), hub admin (invites, limits, usage), and consumer SDK wiring. 中文触发词：aweshare、共享模型、配置agent、hub管理、consumer接入。"
 ---
 
 # aweshare
 
-This skill covers **configuring** the aweshare producer and hub, and applying grants so consumers can call shared models.
+This skill covers **configuring** the aweshare producer and hub so consumers can call shared models.
 
 ## Do Not Launch
 
@@ -15,7 +15,6 @@ You may run these read-only commands:
 - `aweshare producer config path`
 - `aweshare producer config show` (secrets redacted)
 - `aweshare producer doctor`
-- `aweshare producer list`
 - `aweshare hub list [invites|producers|consumers]` (invites: lifecycle pending/used/suspended/revoked/expired, `--reveal` re-shows stored codes, `--token` shows the token each invite minted; producers/consumers: rosters with status and last seen)
 - `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` — recent requests, newest first
 - `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
@@ -23,19 +22,17 @@ You may run these read-only commands:
 You may also run these commands (they modify files/state but are non-interactive):
 - `aweshare producer init [--hub URL] [--token asp_...]` — write config template + empty secrets (no-op if they exist)
 - `aweshare producer config edit` — open config in `$VISUAL`/`$EDITOR`/`vi`
-- `aweshare producer grant --alias ALIAS --consumer NAME [--expires-in 7d|12h|30m|90s]`
-- `aweshare producer revoke --alias ALIAS --consumer NAME`
 - `aweshare hub init`
 - `aweshare hub invite [--role producer|consumer] [--name NAME] [--count N] [--expires-in 7d]` — mint one-time invite codes (`asi_…`, printed once; re-view with `hub list --reveal`); consumers need `--role consumer --name NAME`
 - `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]` — show (bare), merge or clear one consumer's limit overrides
 - `aweshare hub revoke --id N`, `aweshare hub restore --id N` — kill / revive an invite; a redeemed one carries its identity (producer or consumer) with it
 - `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
 
-Identity and permission are split: the operator owns admission (invite codes for both roles; direct admin-API issuance `POST /admin/v1/tokens` still exists as the escape hatch); each producer owns the grants for their namespace. The hub CLI covers admission (`invite`), state (`list`), tuning (`limits`), metering (`usage`) and suspension (`revoke`/`restore`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too. Grants are producer-owned: `producer grant`/`revoke`/`list` is the only management path — admin-token writes get `403 NOT_GRANTED`; the admin API keeps read-only audit access (`GET /admin/v1/grants`). This holds for private hubs (operator == producer) and community hubs (mutually unaffiliated producers) alike.
+The operator owns admission and access: one-time invite codes for both roles (the only admission path; every identity carries its invite handle from mint to suspension). A redeemed consumer key may call **every** offering on the hub — there are no per-alias grants. Guardrails are all hub-side and CLI-managed: per-consumer `limits`, per-offering caps (`maxConcurrentUsers`/`dailyTokens` from the producer's config), and `revoke`/`restore` suspension. The hub CLI covers admission (`invite`), state (`list`), tuning (`limits`), metering (`usage`) and suspension (`revoke`/`restore`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too.
 
 ## Suspension semantics (hub)
 
-Revocation is **reversible suspension**, never deletion, and the invite is the operator's handle: `hub revoke --id N` suspends (a pending code stops pairing; a redeemed one suspends the identity it minted — a producer's tunnel closes at once, a consumer's key gets `401 TOKEN_REVOKED`); `hub restore --id N` brings both back. An invite and its minted identity move together from either handle; restoring a redeemed producer needs a free slot (`403 HUB_FULL` when `AWESHARE_MAX_PRODUCERS`, default 10, active producers are reached — the cap also gates admin-API issuance and invite redeem; consumers have no cap).
+Revocation is **reversible suspension**, never deletion, and the invite is the operator's handle: `hub revoke --id N` suspends (a pending code stops pairing; a redeemed one suspends the identity it minted — a producer's tunnel closes at once, a consumer's key gets `401 TOKEN_REVOKED`); `hub restore --id N` brings both back. An invite and its minted identity move together; restoring a redeemed producer needs a free slot (`403 HUB_FULL` when `AWESHARE_MAX_PRODUCERS`, default 10, active producers are reached — the cap also gates invite redeem; consumers have no cap).
 
 ## Intent Router
 
@@ -47,12 +44,10 @@ Revocation is **reversible suspension**, never deletion, and the invite is the o
 | "Where is the config?" | Config Path | `aweshare producer config path` |
 | "Show my config" | Config Show | `aweshare producer config show` |
 | "Something doesn't work" | Diagnose | `aweshare producer doctor` — fix the first FAIL |
-| "Let NAME use my model" | Grant | `aweshare producer grant --alias ns/model --consumer NAME` |
-| "Stop NAME from using my model" | Revoke (grant) | `aweshare producer revoke --alias ns/model --consumer NAME` |
 | "Suspend / bring back a user or token" | Hub admin | `aweshare hub revoke --id N` / `restore --id N` (by invite, reversible — see Suspension semantics) |
-| "Who can use what?" | Browse | `aweshare producer list` |
+| "Who can use what?" | Browse | Every admitted consumer can call every offering; list them with `aweshare hub list consumers` (admitted) and see what is shared via the consumer catalog (`aweshare consumer list`) |
 | "Set up a hub" | Hub setup | npm or Docker — see Hub Deployment; `init` prints the admin token once; user runs `serve`/container themselves |
-| "Issue a consumer token (asc_)" | Hub admin | `aweshare hub invite --role consumer --name NAME` (bound, single); the consumer redeems the code themselves with `aweshare consumer join` and keeps the printed `asc_` token — see Admission via Invite Codes. Direct admin-API issuance (`POST /admin/v1/tokens`) remains the escape hatch |
+| "Issue a consumer token (asc_)" | Hub admin | `aweshare hub invite --role consumer --name NAME` (bound, single); the consumer redeems the code themselves with `aweshare consumer join` and keeps the printed `asc_` token — see Admission via Invite Codes |
 | "Rate-limit or cap a consumer" | Hub admin | `aweshare hub limits NAME --rps 5 --max-concurrent 2 --tpm 60000 --max-total-tokens 5000000` (merges; bare call views; `--clear` resets to hub-wide defaults; unset keys keep the `AWESHARE_CONSUMER_*` defaults) |
 | "How much was used?" | Metering | `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N]` (admin sees everything; the API `GET /admin/v1/usage` also takes producer/consumer keys, each sees its own slice) |
 | "Invite producers without hand-delivering tokens" | Invite codes | `aweshare hub invite --name NAME` (bound) or `--count N` (unbound); producer redeems via `aweshare producer join` — see Admission via Invite Codes |
@@ -124,7 +119,8 @@ Both roles self-service through one-time invite codes (the CLI's admission path)
 aweshare hub invite --name peng [--expires-in 7d]      # → asi_..., send to the producer
 # producer, unbound: batch hand-out; producer submits name + email at redeem
 aweshare hub invite --count 10 [--expires-in 7d]
-# consumer: always bound to one name, single (no --count) — grants reference consumers by name
+# consumer: always bound to one name, single (no --count) — limits, usage and
+#           suspension reference consumers by name
 aweshare hub invite --role consumer --name alice [--expires-in 7d]
 
 # producer side — redeems the code, writes the token into their config:
@@ -136,7 +132,7 @@ aweshare consumer join --hub https://<hub-host> --code asi_...
 # curl -s -X POST https://<hub-host>/invites/v1/redeem -H 'content-type: application/json' -d '{"code":"asi_..."}'
 ```
 
-Codes are single-use, optionally expiring, and revocable at any stage (`hub list` shows pending/used/suspended/revoked/expired; `hub revoke --id N`, undo with `hub restore --id N`). Revoking a **redeemed** code suspends the identity it minted (a producer's token dies and tunnel closes; a consumer's key is suspended) — one code, one identity; restore revives both. Both `join` commands assert their role, so handing a code to the wrong one fails with `409 INVITE_ROLE_MISMATCH` without burning the code. `hub list --reveal` re-shows stored codes (pre-v4 rows have no plaintext — revoke and re-create those); `hub list --token` shows which token each code minted and when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full; consumers uncapped). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, grant).
+Codes are single-use, optionally expiring, and revocable at any stage (`hub list` shows pending/used/suspended/revoked/expired; `hub revoke --id N`, undo with `hub restore --id N`). Revoking a **redeemed** code suspends the identity it minted (a producer's token dies and tunnel closes; a consumer's key is suspended) — one code, one identity; restore revives both. Both `join` commands assert their role, so handing a code to the wrong one fails with `409 INVITE_ROLE_MISMATCH` without burning the code. `hub list --reveal` re-shows stored codes (pre-v4 rows have no plaintext — revoke and re-create those); `hub list --token` shows which token each code minted and when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full; consumers uncapped). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, start).
 
 ## Producer Config Structure (config.toml)
 
@@ -160,7 +156,9 @@ keyRef = "glm-key"
 alias = "YOUR_NAME/qwen2.5.7b"           # namespace/name, lowercase, globally unique
 backend = "ollama"                       # must match a backends.id
 upstreamModel = "qwen2.5:7b"             # exact id the backend knows (incl. tag)
-maxConcurrency = 1                       # 1..64
+maxConcurrency = 1                       # 1..64 — in-flight REQUEST cap
+# maxConcurrentUsers = 3                 # distinct concurrent CONSUMERS (hub default 3)
+# dailyTokens = 1000000                  # shared tokens per UTC day (default 1M; 0 = unlimited)
 ```
 
 secrets.json maps `keyRef` names to upstream API keys:
@@ -171,6 +169,8 @@ secrets.json maps `keyRef` names to upstream API keys:
 
 **Rules:**
 - The namespace in every alias must match the producer name the token was issued for.
+- One offering = exactly one upstream model: the hub rewrites the request's model to `upstreamModel`, so consumers can never pick another. More models = more `[[offerings]]`.
+- Per-offering caps (`maxConcurrentUsers`, default 3; `dailyTokens`, default 1M, 0 = unlimited) ride the register message and are enforced by the hub — 429 `PRODUCER_MAX_USERS` / `QUOTA_EXCEEDED` (UTC-midnight reset). They apply by default to every alias, including old agents that don't send them.
 - Upstream keys live only in secrets.json on the producer's machine — never in config.toml, never in chat output.
 - `anthropic`-protocol baseUrl excludes `/v1` (the agent appends it); `openai`-protocol baseUrl includes `/v1`; `responses`-protocol baseUrl includes the version path (e.g. `https://open.bigmodel.cn/api/v1`).
 - An alias speaks exactly one wire protocol — there is no cross-protocol conversion.
@@ -184,8 +184,7 @@ secrets.json maps `keyRef` names to upstream API keys:
 2. Edit `config.toml`: set hubUrl/token, define backends and offerings
 3. Put upstream keys in `secrets.json` (chmod 600 already applied)
 4. `aweshare producer doctor` — must be all green
-5. `aweshare producer grant --alias ns/model --consumer NAME`
-6. Tell the user to run `aweshare producer start` in their own terminal
+5. Tell the user to run `aweshare producer start` in their own terminal
 
 ### Add a backend / offering
 
@@ -194,16 +193,6 @@ secrets.json maps `keyRef` names to upstream API keys:
 3. If the backend needs a key: add `keyRef = "name"` and the matching entry in secrets.json
 4. Append an `[[offerings]]` block mapping `namespace/alias` to the backend + upstreamModel
 5. Verify with `aweshare producer doctor`
-
-### Grant / revoke access
-
-```bash
-aweshare producer grant --alias peng/gpt-4o --consumer alice --expires-in 7d
-aweshare producer revoke --alias peng/gpt-4o --consumer alice
-aweshare producer list
-```
-
-Grants are producer-owned: writes need the producer token of the alias namespace, so these commands are the only path (an admin token gets `403 NOT_GRANTED`). The admin API keeps read-only audit access (`GET /admin/v1/grants`).
 
 ### Verify configuration
 
@@ -214,7 +203,7 @@ aweshare producer doctor         # config validity, backend reachability, hub co
 
 ### Consumer Setup
 
-Redeeming an invite: `aweshare consumer join --hub https://<hub-host> --code asi_...` prints the `asc_` token once with these exact exports — tell the consumer to save it, it will not be shown again. After that, consumers point a standard SDK at the hub — no special client:
+Redeeming an invite: `aweshare consumer join --hub https://<hub-host> --code asi_...` prints the `asc_` token once with these exact exports — tell the consumer to save it, it will not be shown again. Discovery: `aweshare consumer list --hub https://<hub-host> --token asc_...` shows every producer, alias, protocol, status and the per-offering caps (`GET /v1/catalog` under the hood). After that, consumers point a standard SDK at the hub — no special client:
 
 ```bash
 # Anthropic SDK / Claude Code

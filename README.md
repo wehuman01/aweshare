@@ -2,7 +2,7 @@
   <img src="./logo/logo.png" alt="aweshare" width="760">
   <h1>aweshare: Local-first AI Capability Relay</h1>
   <p><strong>An open-source, local-first AI capability relay.</strong></p>
-  <p>Share local Ollama/vLLM or authorized OpenAI/Anthropic backends through a grant-based hub, consumed with standard SDKs via <code>namespace/alias</code>.</p>
+  <p>Share local Ollama/vLLM or authorized OpenAI/Anthropic backends through a self-hosted hub, consumed with standard SDKs via <code>namespace/alias</code>.</p>
   <p><strong>Upstream API keys never leave the producer's device.</strong></p>
   <p>
     <strong>English</strong> ·
@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.9-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -44,11 +44,11 @@ Consumer (standard SDK, zero changes)         Producer side
            ▼                         │
 ┌─────────────────────────────┐      │
 │ aweshare hub (public, 1 node)│◄───── WSS reverse tunnel (agent dials out)
-│ auth / grants / route / meter│      no public IP, no port forwarding needed
+│ auth / route / meter         │      no public IP, no port forwarding needed
 └─────────────────────────────┘
 ```
 
-- **Grant-based trust**: consumers can only use aliases explicitly granted to them. No payments, no marketplace.
+- **Invite-only trust**: admission runs through one-time invite codes the operator mints; every admitted consumer may call every offering. No payments, no marketplace.
 - **Namespaced aliases**: `peng/gpt-4o` is globally unique with one owner — routing is a deterministic lookup.
 - v1 relays **native transparent SSE** for OpenAI↔OpenAI (chat completions and Responses), Anthropic↔Anthropic. No cross-protocol conversion, no smart routing, no web console.
 
@@ -56,7 +56,7 @@ Consumer (standard SDK, zero changes)         Producer side
 
 - To route and meter, **consumer prompts and model responses transit the hub in plaintext — this is not end-to-end encryption**. The hub persists no request/response content, but the hub operator can technically see it. Only use a hub instance you trust — which is why the hub is open source and self-hostable.
 - Upstream API keys never leave the producer's device and are never sent to consumers. Tokens are stored **hash-only** (peppered SHA-256): the plaintext is shown exactly once at issue/redeem and can never be re-displayed. Invite codes are the deliberate exception — their plaintext is kept so the operator can re-view them with `hub list --reveal`; a DB leak exposes unredeemed codes, but no tokens.
-- Token revocation is **reversible suspension** (`hub revoke --id N` / `hub restore --id N`, by invite), and an invite and the producer it minted move together: revoking a redeemed code suspends that producer (and closes its tunnel), and restoring from either handle revives both. Nothing is deleted on revoke — grants, offerings and usage history survive a suspension.
+- Token revocation is **reversible suspension** (`hub revoke --id N` / `hub restore --id N`, by invite), and an invite and the producer it minted move together: revoking a redeemed code suspends that producer (and closes its tunnel), and restoring from either handle revives both. Nothing is deleted on revoke — offerings and usage history survive a suspension.
 
 ### Compliance and disclaimer
 
@@ -114,25 +114,17 @@ aweshare consumer join --hub https://hub.example.com --code asi_...
 #   -H 'content-type: application/json' -d '{"code":"asi_..."}'
 ```
 
-Prefer hand-delivering keys? Direct issuance still works via the admin API:
-
-```bash
-curl -X POST https://hub.example.com/admin/v1/tokens \
-  -H "Authorization: Bearer asa_... (the admin token)" -H "content-type: application/json" \
-  -d '{"role":"consumer","name":"alice"}'      # → asc_..., give to the consumer
-```
-
 Three token roles, one per party:
 
 | Role | Who holds it | How it's used |
 |---|---|---|
 | `admin` | hub operator (you only) | the admin REST API (`/admin/v1/*`); CLI side: `hub invite` / `list [invites\|producers\|consumers]` / `revoke` / `restore` |
 | `producer` (`asp_...`) | the agent on the producer's machine | set as `token` in `~/.aweshare/config.toml`; the agent registers its offerings with it |
-| `consumer` (`asc_...`) | whoever calls the models | set in SDK env vars (`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`); the hub uses it to decide which aliases they may call |
+| `consumer` (`asc_...`) | whoever calls the models | set in SDK env vars (`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`); it identifies the consumer for metering, limits and suspension |
 
 The producer's `name` becomes their alias namespace (the `peng/` in `peng/gpt-4o`).
 
-Identity and permission are deliberately split. The operator issues identities — invite codes for producers, `asc_…` keys for consumers — while each producer alone decides who may call their own aliases (`aweshare producer grant`; the admin API can read grants for audit but cannot write them). A fresh consumer key can call nothing until a producer grants it, so the hub works the same whether you run everything yourself (private hub) or producers who don't know each other share yours (community hub).
+The operator owns admission: one-time invite codes for both roles, the only admission path (every identity carries its invite handle for its whole lifecycle). A redeemed consumer key may call **every** offering on the hub — if you let someone in, they can use what is shared. Guardrails: per-consumer `hub limits` (rate, concurrency, token budgets), per-offering caps (`maxConcurrentUsers`, `dailyTokens`) and `hub revoke` suspension, all enforced by the hub.
 
 ### 2. Producer first run (in this order)
 
@@ -149,11 +141,7 @@ aweshare producer init --hub https://hub.example.com --token asp_...
 # ③ doctor: pre-flight checks, ordered to find the first failing link
 aweshare producer doctor
 
-# ④ Grant a consumer
-aweshare producer grant --alias peng/qwen2.5.7b --consumer alice
-#    time-limited trial: add --expires-in 7d (re-granting refreshes the expiry)
-
-# ⑤ Start (long-running; when it stops, aliases go offline and consumers get 503)
+# ④ Start (long-running; when it stops, aliases go offline and consumers get 503)
 aweshare producer start
 ```
 
@@ -200,7 +188,7 @@ If Claude Code has a stale OAuth login it overrides env config — switch with `
 base_url = "https://hub.example.com/v1"
 ```
 
-**Discovering models**: `GET /v1/models` (OpenAI SDK `client.models.list()`) returns every alias granted to the key, with online status.
+**Discovering models**: `GET /v1/models` (OpenAI SDK `client.models.list()`) returns every alias registered on the hub, with online status.
 
 ## Producer config reference (~/.aweshare/config.toml)
 
@@ -230,7 +218,20 @@ alias = "peng/qwen2.5.7b"                # namespace must be your producer name
 backend = "ollama"
 upstreamModel = "qwen2.5:7b"             # the real backend id (full tag from `ollama list`)
 maxConcurrency = 1                       # start at 1 for local models; raise for cloud APIs
+# maxConcurrentUsers = 3                 # distinct concurrent consumers (hub default 3)
+# dailyTokens = 1000000                  # shared tokens per UTC day (default 1M; 0 = unlimited)
 ```
+
+One offering exposes exactly one upstream model: consumers call the alias and the hub rewrites the request's model to `upstreamModel` before dispatch — they can never pick another model. To share more models, add more `[[offerings]]`.
+
+**Per-offering usage caps** ride along in the same block; both are optional and enforced by the hub (defaults apply when unset, including for agents that predate them):
+
+| Key | Default | Meaning | Enforcement |
+|---|---|---|---|
+| `maxConcurrentUsers` | 3 | distinct consumers with a request in flight on this alias | 429 `PRODUCER_MAX_USERS` |
+| `dailyTokens` | 1000000 | tokens (prompt + completion) shared across all consumers on this alias, per UTC day; `0` = unlimited | 429 `QUOTA_EXCEEDED` (resets at UTC midnight) |
+
+`maxConcurrency` caps in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a single consumer firing 5 parallel requests needs `maxConcurrency ≥ 5` but still counts as one user. Daily caps count recorded usage (see "Honest limits" below).
 
 Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; keep `secrets.json` at 0600 and out of git/screenshots; rotate on suspected leaks. Before sharing, check the upstream's terms: account rules, subscription limits, forwarding and commercial-use constraints.
 
@@ -255,8 +256,6 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `tpm` | max tokens (prompt + completion) in any sliding 60s window | 429 `RATE_LIMITED` (in-memory window, like the RPS bucket) |
 | `maxTotalTokens` | lifetime token budget for this consumer | 429 `QUOTA_EXCEEDED` (sums `usage_events`) |
 
-Grants can also carry an expiry: `aweshare producer grant --alias peng/gpt-4o --consumer alice --expires-in 7d`. Grant writes are producer-owned — the admin API keeps read-only audit access but rejects admin-token writes with `403 NOT_GRANTED`. An expired grant returns `403 GRANT_EXPIRED`; re-granting refreshes the expiry.
-
 Honest limits: token-based caps count what upstreams report — Ollama streams report no usage, so they contribute 0. Both TPM and the lifetime budget are observed-usage thresholds, not hard reservations: one request can cross the threshold, and concurrent requests that start before earlier usage is recorded can overshoot it further. Once recorded usage has reached the threshold, new requests are rejected.
 
 ## Endpoints and errors
@@ -264,13 +263,14 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/chat/completions` · `POST /v1/messages` · `POST /v1/responses` | inference (Bearer or `x-api-key`) |
-| `GET /v1/models` | aliases visible to this key, with status |
+| `GET /v1/models` | every alias registered on the hub, with status |
+| `GET /v1/catalog` | every offering on the hub — producer, alias, protocol, status, the per-offering caps (discovery view for `aweshare consumer list`) |
 | `GET /healthz` | liveness |
-| `/admin/v1/*` | token/limit/usage management (admin or producer token) · grants: writes producer-only, admin reads for audit · consumer limit overrides: `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits` (admin only) |
+| `/admin/v1/*` | token/limit/usage management (admin or producer token) · consumer limit overrides: `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits` (admin only) |
 
-Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403` not granted or `GRANT_EXPIRED` · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`QUOTA_EXCEEDED` = lifetime token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
+Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`PRODUCER_MAX_USERS` = distinct-consumer cap; `QUOTA_EXCEEDED` = lifetime or daily token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
 
-Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Producers list grants with `aweshare producer list`; usage is queried with `aweshare hub usage` or `GET /admin/v1/usage` (admin sees everything, producers and consumers their own slice).
+Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Usage is queried with `aweshare hub usage` or `GET /admin/v1/usage` (admin sees everything, producers and consumers their own slice).
 
 ## Command reference
 
@@ -288,7 +288,7 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | recent requests, newest first — one row per request, zero content stored |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
 
-Token issuance runs through invites (both roles). `limits` and `usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too. Grants are producer-owned and were never the operator's CLI: manage them with `aweshare producer grant`/`revoke`/`list` on the producer machine (the admin API keeps read-only audit access).
+Token issuance runs through invites (both roles). `limits` and `usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too.
 
 `list` prints an aligned table by default; append `--json` for the raw API response.
 
@@ -300,16 +300,14 @@ Token issuance runs through invites (both roles). `limits` and `usage` are thin 
 | `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | redeem an invite code into a producer token and write it into the config (`--name`/`--email` for unbound codes; probes the hub first — plain HTTP outside the LAN needs `--allow-http`) |
 | `aweshare producer config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
 | `aweshare producer doctor` | pre-flight checks — fix the first FAIL, re-run |
-| `aweshare producer grant --alias ns/model --consumer NAME [--expires-in 7d]` | grant a consumer access |
-| `aweshare producer revoke --alias ns/model --consumer NAME` | revoke access |
-| `aweshare producer list` | list grants for your namespace |
 | `aweshare producer start` | connect and relay (long-running; run it in your own terminal) |
 
-**Consumer** — one command, on the consumer's machine; day-to-day they point a standard SDK at the hub (see Consumer tool configuration):
+**Consumer** — two commands, on the consumer's machine; day-to-day they point a standard SDK at the hub (see Consumer tool configuration):
 
 | Command | Purpose |
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it: the hub stores only a hash) |
+| `aweshare consumer list --hub URL --token asc_… [--json]` | discovery view of the hub: every producer, alias, protocol, status, the per-offering caps |
 
 CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
 
@@ -343,7 +341,7 @@ Updating a npm install: `aweshare self-update` (asks before installing; `--check
 
 ```bash
 pnpm install
-pnpm test        # 98 tests: protocol / hub contract (fake agent vs real hub) / agent unit / e2e (real SDKs)
+pnpm test        # 197 tests: protocol / hub contract (fake agent vs real hub) / agent unit / e2e (real SDKs)
 pnpm build       # tsc -b, whole monorepo
 pnpm check       # biome
 ```

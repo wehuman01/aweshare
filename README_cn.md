@@ -2,7 +2,7 @@
   <img src="./logo/logo.png" alt="aweshare" width="760">
   <h1>aweshare：开源、local-first 的 AI 能力中继</h1>
   <p><strong>开源、local-first 的 AI 能力中继。</strong></p>
-  <p>通过基于授权（grant）的 Hub 共享本地 Ollama/vLLM 或已授权的 OpenAI/Anthropic 后端，消费者用标准 SDK 以 <code>命名空间/别名</code> 调用。</p>
+  <p>通过自建 Hub 共享本地 Ollama/vLLM 或已授权的 OpenAI/Anthropic 后端，消费者用标准 SDK 以 <code>命名空间/别名</code> 调用。</p>
   <p><strong>上游 API Key 永不离开生产者设备。</strong></p>
   <p>
     <a href="./README.md">English</a> ·
@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.3.9-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -44,11 +44,11 @@
            ▼                         │
 ┌─────────────────────────────┐      │
 │ aweshare hub（公网单实例）    │◄─────── WSS 反向隧道（Agent 主动外连）
-│ 鉴权 / 授权 / 路由 / 计量     │       生产者无需公网 IP、无需端口映射
+│ 鉴权 / 路由 / 计量          │       生产者无需公网 IP、无需端口映射
 └─────────────────────────────┘
 ```
 
-- 生产者授权制：消费者只能使用被显式授权（grant）的别名，无支付、无市场。
+- 邀请码准入制：准入统一走运营者签发的一次性邀请码，被准入的消费者可调用 hub 上全部 offering。无支付、无市场。
 - 命名空间别名：`peng/gpt-4o` 全局唯一、属主唯一，路由是确定性查找。
 - v1 只做 OpenAI↔OpenAI（chat completions 与 Responses）与 Anthropic↔Anthropic 的**原生透明 SSE 转发**，不做跨协议转换、智能路由、Web 控制台。
 
@@ -56,7 +56,7 @@
 
 - 为完成路由与计量，**消费者的提示词与模型响应都会经过 Hub，不是端到端加密**。Hub 不持久化任何请求/响应内容，但 Hub 运维者技术上可见明文——请只使用你信得过的 Hub 实例（这也是 Hub 开源 + 自建部署的意义）。
 - 上游 API Key 永不离开生产者设备，也不会发给消费者。令牌在库内**只存哈希**（加盐 SHA-256）：明文只在签发/兑换时展示一次，之后永远无法重新查看。邀请码是有意的例外——保留明文供运维者用 `hub list --reveal` 找回；数据库泄露会暴露未兑换的邀请码，但不会暴露任何令牌。
-- 令牌吊销是**可逆挂起**（`hub revoke --id N` / `hub restore --id N`，按邀请码操作），且邀请码与它换出的生产者同进退：撤销已兑换的码即挂起对应生产者（并断开其隧道），从任一侧 restore 都同时救回两者。吊销不删除任何数据——授权、offerings 与用量记录在挂起期间完整保留。
+- 令牌吊销是**可逆挂起**（`hub revoke --id N` / `hub restore --id N`，按邀请码操作），且邀请码与它换出的生产者同进退：撤销已兑换的码即挂起对应生产者（并断开其隧道），从任一侧 restore 都同时救回两者。吊销不删除任何数据——offerings 与用量记录在挂起期间完整保留。
 
 ### 合规与免责
 
@@ -113,25 +113,17 @@ aweshare consumer join --hub https://hub.example.com --code asi_...
 #   -H 'content-type: application/json' -d '{"code":"asi_..."}'
 ```
 
-想直接递密钥也行——admin API 直发仍然可用：
-
-```bash
-curl -X POST https://hub.example.com/admin/v1/tokens \
-  -H "Authorization: Bearer asa_...（admin 令牌）" -H "content-type: application/json" \
-  -d '{"role":"consumer","name":"alice"}'      # → asc_...，给消费者
-```
-
 三种 token 角色，对应三方：
 
 | 角色 | 谁持有 | 怎么用 |
 |---|---|---|
 | `admin` | Hub 操作者（只有你） | admin REST API（`/admin/v1/*`）；CLI 侧：`hub invite` / `list [invites\|producers\|consumers]` / `revoke` / `restore` |
 | `producer`（`asp_...`） | 生产者机器上的 agent | 写进 `~/.aweshare/config.toml` 的 `token` 字段，agent 靠它向 hub 注册 offering |
-| `consumer`（`asc_...`） | 调用模型的一方 | 填在 SDK 环境变量（`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`）里，hub 靠它判断能调哪些别名 |
+| `consumer`（`asc_...`） | 调用模型的一方 | 填在 SDK 环境变量（`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`）里，hub 靠它识别消费者并做计量、限额与挂起 |
 
 `name` 即生产者的别名命名空间（`peng/gpt-4o` 的 `peng/`）。
 
-**身份与权限刻意分离**：运营者只发身份——生产者的邀请码、消费者的 `asc_…` 密钥；谁能调用哪个别名，由该生产者一人决定（`aweshare producer grant`；admin API 对授权只保留只读审计，写入会被拒绝）。刚领的消费者密钥在被授权之前什么都调不了——私有 hub（全是你自己的机器）和社区 hub（互不隶属的生产者共享你的 hub）因此用同一套规则运转。
+**准入完全归运营者**：两种角色统一走一次性邀请码（唯一准入路径，每个身份的全生命周期都带着邀请码这个把手）。兑换成功的消费者密钥可调用 hub 上**全部** offering——放谁进来，谁就能用共享的一切。兜底手段：按消费者的 `hub limits`（限流、并发、token 预算）、按 offering 的限额（`maxConcurrentUsers`、`dailyTokens`）与 `hub revoke` 挂起，全部由 hub 强制执行。
 
 ### 2. 生产者首跑（按顺序）
 
@@ -148,11 +140,7 @@ aweshare producer init --hub https://hub.example.com --token asp_...
 # ③ doctor：预检，按「先找第一个失败环节」的顺序
 aweshare producer doctor
 
-# ④ 授权消费者
-aweshare producer grant --alias peng/qwen2.5.7b --consumer alice
-#    限时试用：加 --expires-in 7d（重复授权会刷新到期时间）
-
-# ⑤ 启动（长驻进程；停止即别名下线，消费者会收到 503）
+# ④ 启动（长驻进程；停止即别名下线，消费者会收到 503）
 aweshare producer start
 ```
 
@@ -199,7 +187,7 @@ Claude Code 若残留旧 OAuth 登录态会覆盖环境变量配置，用 `/logi
 base_url = "https://hub.example.com/v1"
 ```
 
-**发现可用模型**：`GET /v1/models`（OpenAI SDK `client.models.list()`）返回该密钥被授权的全部别名及在线状态。
+**发现可用模型**：`GET /v1/models`（OpenAI SDK `client.models.list()`）返回 hub 上已注册的全部别名及在线状态。
 
 ## 生产者配置参考（~/.aweshare/config.toml）
 
@@ -229,7 +217,20 @@ alias = "peng/qwen2.5.7b"                # 命名空间必须是你的生产者 
 backend = "ollama"
 upstreamModel = "qwen2.5:7b"             # 必须是后端真实 ID（ollama list 的完整 tag）
 maxConcurrency = 1                       # 本地模型从 1 起步，云端 API 可调高
+# maxConcurrentUsers = 3                 # 同时在用的不同消费者数（hub 默认 3）
+# dailyTokens = 1000000                  # 每日共享 token 额度（UTC 日，默认 100 万；0 = 无上限）
 ```
+
+一条 offering 恰好暴露一个上游模型：消费者调用别名，hub 在转发前把请求里的 model 强制改写为 `upstreamModel`——他们永远无法选用其他模型。想多开放模型就多写几条 `[[offerings]]`。
+
+**按别名的用量约束**写在同一段里，两项都可选、由 hub 执行（未设置时套默认值，包括旧版 agent 未上传的场景）：
+
+| 键 | 默认 | 含义 | 执行 |
+|---|---|---|---|
+| `maxConcurrentUsers` | 3 | 该别名上同时有进行中请求的**不同消费者数**上限 | 429 `PRODUCER_MAX_USERS` |
+| `dailyTokens` | 1000000 | 该别名每 **UTC 日**跨消费者合计的 token（prompt+completion）额度；`0` = 无上限 | 429 `QUOTA_EXCEEDED`（UTC 午夜重置） |
+
+`maxConcurrency` 限的是并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——一个消费者并发发 5 个请求需要 `maxConcurrency ≥ 5`，但仍然只算一个用户。日额度统计已记录用量（见下文「诚实的限制」）。
 
 密钥卫生：用专用最小权限、可撤销、带预算告警的 key；`secrets.json` 保持 0600、不进 git/截图；疑似泄露立即轮换。共享权利自查：账号条款、订阅限制、转发与商用约束。
 
@@ -254,8 +255,6 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `tpm` | 任意滑动 60 秒窗口内的 token 上限（prompt + completion） | 429 `RATE_LIMITED`（内存窗口，与 RPS 桶一致） |
 | `maxTotalTokens` | 该消费者的终身 token 预算 | 429 `QUOTA_EXCEEDED`（对 `usage_events` 求和） |
 
-授权可带有效期：`aweshare producer grant --alias peng/gpt-4o --consumer alice --expires-in 7d`。授权写入是生产者专属——admin API 只保留只读审计，admin 令牌写入会得到 `403 NOT_GRANTED`。过期授权返回 `403 GRANT_EXPIRED`；重新授权会刷新到期时间。
-
 诚实的限制说明：token 类上限只统计上游报告的用量——Ollama 流式响应不带 usage，按 0 计。TPM 和终身预算都是基于已观测用量的阈值，不是预留式硬上限：单个请求可能跨过阈值，先于已有请求用量落库的并发请求还会进一步超额；已记录用量达到阈值后，新请求才会被拒绝。
 
 ## 端点与错误
@@ -263,13 +262,14 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | 端点 | 说明 |
 |---|---|
 | `POST /v1/chat/completions` · `POST /v1/messages` · `POST /v1/responses` | 推理入口（Bearer 或 `x-api-key`） |
-| `GET /v1/models` | 当前密钥可见的别名与状态 |
+| `GET /v1/models` | hub 上已注册的全部别名与状态 |
+| `GET /v1/catalog` | hub 全部 offering——生产者、别名、协议、状态、按别名的限额（`aweshare consumer list` 的发现视图） |
 | `GET /healthz` | 存活探测 |
-| `/admin/v1/*` | 令牌/限额/用量管理（admin 或生产者令牌）· 授权：写入仅生产者、admin 只读审计 · 消费者限制覆盖：`GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`（仅 admin） |
+| `/admin/v1/*` | 令牌/限额/用量管理（admin 或生产者令牌）· 消费者限制覆盖：`GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`（仅 admin） |
 
-错误语义：`401` 无效密钥 · `401 TOKEN_REVOKED` 令牌被挂起（请联系运维者 restore） · `403` 未获授权或授权已过期（`GRANT_EXPIRED`） · `403 HUB_FULL` 生产者容量已满 · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`QUOTA_EXCEEDED` = 终身 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
+错误语义：`401` 无效密钥 · `401 TOKEN_REVOKED` 令牌被挂起（请联系运维者 restore） · `403 HUB_FULL` 生产者容量已满 · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`PRODUCER_MAX_USERS` = 不同消费者数上限；`QUOTA_EXCEEDED` = 终身或每日 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
 
-用量记录：每请求一行（别名、真实模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。生产者 `aweshare producer list` 查看授权；用量用 `aweshare hub usage` 或 `GET /admin/v1/usage` 查询（admin 全量，生产者/消费者各看自己那份）。
+用量记录：每请求一行（别名、真实模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。用量用 `aweshare hub usage` 或 `GET /admin/v1/usage` 查询（admin 全量，生产者/消费者各看自己那份）。
 
 ## 常用命令
 
@@ -287,7 +287,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | 最近请求用量，新在前——每请求一行，内容零落库 |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
 
-令牌签发统一走邀请码（两种角色）。`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。授权归生产者所有，从来不在运营者的 CLI 上：在生产者机器上用 `aweshare producer grant`/`revoke`/`list` 管理（admin API 保留只读审计）。
+令牌签发统一走邀请码（两种角色）。`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。
 
 list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 
@@ -299,16 +299,14 @@ list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 | `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | 兑换邀请码得到 producer 令牌并写入配置（不绑定码需 `--name`/`--email`；先探测 hub——局域网以外的明文 HTTP 需 `--allow-http`） |
 | `aweshare producer config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
 | `aweshare producer doctor` | 预检——修好第一个 FAIL 再重跑 |
-| `aweshare producer grant --alias ns/model --consumer NAME [--expires-in 7d]` | 授权消费者 |
-| `aweshare producer revoke --alias ns/model --consumer NAME` | 取消授权 |
-| `aweshare producer list` | 列出你命名空间下的授权 |
 | `aweshare producer start` | 连接并转发（长驻进程，在自己终端里跑） |
 
-**消费者侧**——只有一条命令，跑在消费者机器上；日常使用时标准 SDK 直连 hub（见「消费工具配置」）：
+**消费者侧**——两条命令，跑在消费者机器上；日常使用时标准 SDK 直连 hub（见「消费工具配置」）：
 
 | 命令 | 用途 |
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存：hub 只存哈希） |
+| `aweshare consumer list --hub URL --token asc_… [--json]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额 |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 
@@ -342,7 +340,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 
 ```bash
 pnpm install
-pnpm test        # 98 tests：协议包/Hub 契约（假Agent打真Hub）/Agent 单测/e2e（真实 SDK）
+pnpm test        # 197 项测试：协议包/Hub 契约（假Agent打真Hub）/Agent 单测/e2e（真实 SDK）
 pnpm build       # tsc -b 全仓
 pnpm check       # biome
 ```
