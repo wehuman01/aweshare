@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.0-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.1-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -55,7 +55,7 @@
 ## 信任边界（先读这个）
 
 - 为完成路由与计量，**消费者的提示词与模型响应都会经过 Hub，不是端到端加密**。Hub 不持久化任何请求/响应内容，但 Hub 运维者技术上可见明文——请只使用你信得过的 Hub 实例（这也是 Hub 开源 + 自建部署的意义）。
-- 上游 API Key 永不离开生产者设备，也不会发给消费者。令牌在库内**只存哈希**（加盐 SHA-256）：明文只在签发/兑换时展示一次，之后永远无法重新查看。邀请码是有意的例外——保留明文供运维者用 `hub list --reveal` 找回；数据库泄露会暴露未兑换的邀请码，但不会暴露任何令牌。
+- 上游 API Key 永不离开生产者设备，也不会发给消费者。令牌在库内**有意存两份**：加盐 SHA-256 哈希用于认证，明文同时保留，运维者可用 `hub list --token` 把弄丢的令牌交还本人。邀请码同理——明文可通过 `hub list --reveal` 找回。数据库泄露会暴露全部身份，请妥善保管数据目录。
 - 令牌吊销是**可逆挂起**（`hub revoke --id N` / `hub restore --id N`，按邀请码操作），且邀请码与它换出的生产者同进退：撤销已兑换的码即挂起对应生产者（并断开其隧道），从任一侧 restore 都同时救回两者。吊销不删除任何数据——offerings 与用量记录在挂起期间完整保留。
 
 ### 合规与免责
@@ -141,7 +141,9 @@ aweshare producer init --hub https://hub.example.com --token asp_...
 aweshare producer doctor
 
 # ④ 启动（长驻进程；停止即别名下线，消费者会收到 503）
-aweshare producer start
+aweshare producer start            # 前台运行；加 --background 转入后台
+#    后台实例用 'aweshare producer doctor --status' 查看，
+#    用 'aweshare producer stop' 停止
 ```
 
 ### 3. 消费者首跑（按顺序）
@@ -298,19 +300,22 @@ list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 | `aweshare producer init [--hub URL] [--token asp_…]` | 写入 `~/.aweshare` 配置模板 |
 | `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | 兑换邀请码得到 producer 令牌并写入配置（不绑定码需 `--name`/`--email`；先探测 hub——局域网以外的明文 HTTP 需 `--allow-http`） |
 | `aweshare producer config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
-| `aweshare producer doctor` | 预检——修好第一个 FAIL 再重跑 |
-| `aweshare producer start` | 连接并转发（长驻进程，在自己终端里跑） |
+| `aweshare producer doctor [--status]` | 端到端诊断：后台实例、配置、后端探测、hub、最近日志（`--status` 跳过网络探测，秒回） |
+| `aweshare producer start [--background]` | 连接并转发（长驻进程；`--background` 转入后台——日志写 `~/.aweshare/producer.log`，pid 写 `producer.pid`） |
+| `aweshare producer stop` | 停止后台 producer（SIGTERM，10 秒后 SIGKILL）并清理 pidfile |
 
 **消费者侧**——两条命令，跑在消费者机器上；日常使用时标准 SDK 直连 hub（见「消费工具配置」）：
 
 | 命令 | 用途 |
 |---|---|
-| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存：hub 只存哈希） |
+| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list --token` 找回） |
 | `aweshare consumer list --hub URL --token asc_… [--json]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额 |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 
 ## 运维
+
+没有常开的机器可以共享，或者想用别人共享的模型？项目开发者运营着一个社区 hub：**https://aweshare.wehuman.top**（邀请制——向 peng@wehuman.top 申请邀请码）；[docs/community-hub/](./docs/community-hub/README_cn.md) 是面向生产者/消费者的逐步接入指南（English version）。
 
 hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Docker 内是 `/data/config.toml`）。`aweshare hub init` 会生成模板，全部键注释着——取消注释即覆盖默认值。键名与下表同义、用 camelCase（`consumerRps`、`headTimeoutMs`…）。优先级：`serve` 参数（`--host`/`--port`）> 环境变量 > config.toml > 默认值。文件有问题（非法 TOML、未知键、非正数值）启动即报错并指名键；`AWESHARE_HUB_DATA_DIR` 本身只能用环境变量（它决定文件在哪）。
 

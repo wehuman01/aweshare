@@ -9,7 +9,7 @@ This skill covers **configuring** the aweshare producer and hub so consumers can
 
 ## Do Not Launch
 
-**Never run `aweshare producer start` or `aweshare hub serve` inside this agent.** Both are long-running foreground processes that would block the session. The same applies to starting the hub as a container (`docker run` / `docker compose up` of `ghcr.io/wehuman01/aweshare`) — deploying a service is the user's call. If the user wants to run them, give them the commands (see Hub Deployment) or tell them to run it in their own terminal (or as a service/systemd/daemon).
+**Never launch the long-running services from this agent** — not `aweshare hub serve`, not `aweshare producer start` (foreground it would block the session; even with `--background`, starting/stopping the shared service is the user's call). The same applies to starting the hub as a container (`docker run` / `docker compose up` of `ghcr.io/wehuman01/aweshare`) — deploying a service is the user's call. If the user wants to run them, give them the commands (see Hub Deployment) or tell them to run them in their own terminal (or as a service/systemd/daemon); a detached producer is inspected with `aweshare producer doctor --status` and stopped with `aweshare producer stop`.
 
 You may run these read-only commands:
 - `aweshare producer config path`
@@ -127,12 +127,12 @@ aweshare hub invite --role consumer --name alice [--expires-in 7d]
 aweshare producer join --hub https://<hub-host> --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 
 # consumer side — prints the asc_ token once with ready-to-paste SDK env vars
-# (save it: the hub stores only a hash); no aweshare? curl works too:
+# (save it; the operator can re-view it with `hub list --token`); no aweshare? curl works too:
 aweshare consumer join --hub https://<hub-host> --code asi_...
 # curl -s -X POST https://<hub-host>/invites/v1/redeem -H 'content-type: application/json' -d '{"code":"asi_..."}'
 ```
 
-Codes are single-use, optionally expiring, and revocable at any stage (`hub list` shows pending/used/suspended/revoked/expired; `hub revoke --id N`, undo with `hub restore --id N`). Revoking a **redeemed** code suspends the identity it minted (a producer's token dies and tunnel closes; a consumer's key is suspended) — one code, one identity; restore revives both. Both `join` commands assert their role, so handing a code to the wrong one fails with `409 INVITE_ROLE_MISMATCH` without burning the code. `hub list --reveal` re-shows stored codes (pre-v4 rows have no plaintext — revoke and re-create those); `hub list --token` shows which token each code minted and when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full; consumers uncapped). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, start).
+Codes are single-use, optionally expiring, and revocable at any stage (`hub list` shows pending/used/suspended/revoked/expired; `hub revoke --id N`, undo with `hub restore --id N`). Revoking a **redeemed** code suspends the identity it minted (a producer's token dies and tunnel closes; a consumer's key is suspended) — one code, one identity; restore revives both. Both `join` commands assert their role, so handing a code to the wrong one fails with `409 INVITE_ROLE_MISMATCH` without burning the code. `hub list --reveal` re-shows stored codes; `hub list --token` re-shows each minted token with when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full; consumers uncapped). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, start).
 
 ## Producer Config Structure (config.toml)
 
@@ -184,7 +184,7 @@ secrets.json maps `keyRef` names to upstream API keys:
 2. Edit `config.toml`: set hubUrl/token, define backends and offerings
 3. Put upstream keys in `secrets.json` (chmod 600 already applied)
 4. `aweshare producer doctor` — must be all green
-5. Tell the user to run `aweshare producer start` in their own terminal
+5. Tell the user to run `aweshare producer start` in their own terminal — or `aweshare producer start --background` to detach it (logs to `~/.aweshare/producer.log`), then check `producer doctor --status` / stop with `producer stop`
 
 ### Add a backend / offering
 
@@ -198,7 +198,8 @@ secrets.json maps `keyRef` names to upstream API keys:
 
 ```bash
 aweshare producer config show    # config with token + secrets redacted
-aweshare producer doctor         # config validity, backend reachability, hub connectivity
+aweshare producer doctor         # instance, config, backends, hub, recent log — fix the first FAIL
+aweshare producer doctor --status  # background instance state + recent log only, no network probes
 ```
 
 ### Consumer Setup
@@ -235,7 +236,7 @@ docker pull ghcr.io/wehuman01/aweshare:latest    # or plain docker: stop/rm + re
 
 Rules of thumb:
 - Update the hub first (it is the public entry point), then producer agents. Agents redial automatically after a hub restart (reverse tunnel, latest-wins); consumers see 503 only during the brief restart window.
-- A running `aweshare producer start` does not hot-reload — restart it after updating the CLI on that machine.
+- A running `aweshare producer start` does not hot-reload — restart it after updating the CLI on that machine (background instances: `producer stop`, then `start --background` again).
 - The CLI prints a passive update reminder at most once per 24h; disable with `AWESHARE_NO_UPDATE_CHECK=1`.
 
 If the installed `aweshare` doesn't match what the user expects from the repository:
@@ -251,7 +252,7 @@ Before sharing a backend, warn the user: relaying a personal-subscription API ke
 
 ## Core Rules
 
-1. **Do not run `producer start` or `hub serve` inside the agent.** They are foreground long-running processes. Tell the user to run them in their own terminal.
+1. **Do not run `producer start` or `hub serve` inside the agent.** `hub serve` and foreground `producer start` are long-running blocking processes; even detached (`--background`) the service is the user's call. Tell the user to run them in their own terminal.
 2. Always read the config before editing. Never overwrite existing backends/offerings without checking.
 3. Never print or copy upstream API keys from secrets.json. Use `aweshare producer config show` (redacted) when showing config to the user.
 4. Offering aliases must be `namespace/name` (lowercase) with the namespace matching the producer token's name; names are globally unique on the hub.

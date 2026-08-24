@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-24
+
+### Added
+
+- **`producer start --background` / `stop`, and a doctor that sees the running instance** — the producer can now run detached: `start --background` spawns a background instance (logs append to `~/.aweshare/producer.log`, pid recorded in `producer.pid`, both 0600), waits briefly and surfaces the log tail if it dies instantly. `stop` ends it (SIGTERM, SIGKILL after a 10s grace) and cleans up the pidfile. **`doctor` is now the single diagnostic, pre-flight and runtime**: it leads with an `instance` check (running with pid + uptime; a pidfile naming a dead process FAILS as a crashed daemon) and appends the recent producer.log (pino JSON rendered readably); `doctor --status` shows just that instance state and log tail, skipping every network probe for an instant answer. A second `start` refuses while a background instance is alive (two instances would kick each other off the hub's latest-wins tunnel). Foreground `start` is unchanged. Connection lifecycle events (`registered`, tunnel close/reconnect) are now logged at info/warn so detached logs are actually useful.
+- **Community hub guide** — step-by-step producer/consumer quickstarts (trust rules, endpoints, FAQ) now live under `docs/community-hub/` (English + 中文), and both READMEs' Operations sections point at the developer-run invite-based hub at **https://aweshare.wehuman.top** (request a code at peng@wehuman.top) for anyone without an always-on box to share from.
+
+### Changed
+
+- **`hub list --token` shows real tokens again** — reversing schema v5's hash-only rule, tokens join invite codes as the deliberate on-disk plaintext: redeem now keeps the plaintext (`token_plain` columns, schema v9, auto-migrated) next to the auth hash, so a user who loses their token gets the same identity handed back instead of re-pairing. Authentication is untouched (peppered SHA-256); the exposure widens accordingly — a data-dir reader can now act as an existing identity, so guard it. Identities minted before this release have no stored plaintext and keep showing `#id name` in the TOKEN column; hand them a fresh invite. `--json` follows `--token` the way it follows `--reveal`.
+
 ## [0.4.0] - 2026-08-24
 
 ### Removed

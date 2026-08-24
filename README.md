@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.0-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.1-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -55,7 +55,7 @@ Consumer (standard SDK, zero changes)         Producer side
 ## Trust boundary (read this first)
 
 - To route and meter, **consumer prompts and model responses transit the hub in plaintext — this is not end-to-end encryption**. The hub persists no request/response content, but the hub operator can technically see it. Only use a hub instance you trust — which is why the hub is open source and self-hostable.
-- Upstream API keys never leave the producer's device and are never sent to consumers. Tokens are stored **hash-only** (peppered SHA-256): the plaintext is shown exactly once at issue/redeem and can never be re-displayed. Invite codes are the deliberate exception — their plaintext is kept so the operator can re-view them with `hub list --reveal`; a DB leak exposes unredeemed codes, but no tokens.
+- Upstream API keys never leave the producer's device and are never sent to consumers. Tokens are stored twice on purpose: a **peppered SHA-256 hash** drives authentication, and the plaintext is kept so the operator can hand a lost one back (`hub list --token`). Invite codes work the same way — their plaintext is re-viewable with `hub list --reveal`. A DB leak therefore exposes every identity, so guard the data dir.
 - Token revocation is **reversible suspension** (`hub revoke --id N` / `hub restore --id N`, by invite), and an invite and the producer it minted move together: revoking a redeemed code suspends that producer (and closes its tunnel), and restoring from either handle revives both. Nothing is deleted on revoke — offerings and usage history survive a suspension.
 
 ### Compliance and disclaimer
@@ -142,7 +142,9 @@ aweshare producer init --hub https://hub.example.com --token asp_...
 aweshare producer doctor
 
 # ④ Start (long-running; when it stops, aliases go offline and consumers get 503)
-aweshare producer start
+aweshare producer start            # foreground; add --background to detach it
+#    detached runs are checked with 'aweshare producer doctor --status'
+#    and stopped with 'aweshare producer stop'
 ```
 
 ### 3. Consumer first run (in this order)
@@ -283,7 +285,7 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub init` | create data dir + admin token (printed once) |
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in 7d]` | mint one-time invite codes (`asi_…`, printed once; re-view with `list --reveal`); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
-| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` minted tokens), or the producer/consumer rosters with status and last seen |
+| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` the minted tokens), or the producer/consumer rosters with status and last seen |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
 | `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | recent requests, newest first — one row per request, zero content stored |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
@@ -299,19 +301,22 @@ Token issuance runs through invites (both roles). `limits` and `usage` are thin 
 | `aweshare producer init [--hub URL] [--token asp_…]` | write config templates into `~/.aweshare` |
 | `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | redeem an invite code into a producer token and write it into the config (`--name`/`--email` for unbound codes; probes the hub first — plain HTTP outside the LAN needs `--allow-http`) |
 | `aweshare producer config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
-| `aweshare producer doctor` | pre-flight checks — fix the first FAIL, re-run |
-| `aweshare producer start` | connect and relay (long-running; run it in your own terminal) |
+| `aweshare producer doctor [--status]` | diagnose end to end: background instance, config, backend probes, hub, recent log (`--status` skips the network probes for an instant answer) |
+| `aweshare producer start [--background]` | connect and relay (long-running; `--background` detaches it — logs to `~/.aweshare/producer.log`, pid to `producer.pid`) |
+| `aweshare producer stop` | stop the background producer (SIGTERM, SIGKILL after 10s) and clean up its pidfile |
 
 **Consumer** — two commands, on the consumer's machine; day-to-day they point a standard SDK at the hub (see Consumer tool configuration):
 
 | Command | Purpose |
 |---|---|
-| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it: the hub stores only a hash) |
+| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it; the operator can re-view it with `hub list --token`) |
 | `aweshare consumer list --hub URL --token asc_… [--json]` | discovery view of the hub: every producer, alias, protocol, status, the per-offering caps |
 
 CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
 
 ## Operations
+
+No always-on box to share from, or looking for models others share? The project's developer runs a community hub at **https://aweshare.wehuman.top** (invite-based — request a code at peng@wehuman.top); [docs/community-hub/](./docs/community-hub/README.md) is a step-by-step guide for connecting as a producer or consumer (中文版).
 
 The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Docker: `/data/config.toml`). `aweshare hub init` writes the template with every key commented out — uncomment to override a default. Keys use the same names as below, camelCase (`consumerRps`, `headTimeoutMs`, …). Precedence: `serve` flags (`--host`/`--port`) > env vars > config.toml > defaults. A broken file (invalid TOML, unknown key, non-positive value) fails fast at startup with the key named; `AWESHARE_HUB_DATA_DIR` itself stays env-only (it locates the file).
 

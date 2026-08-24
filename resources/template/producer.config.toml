@@ -1,0 +1,53 @@
+# aweshare producer configuration (~/.aweshare/config.toml)
+# Secrets live in ~/.aweshare/secrets.json and never leave this machine.
+
+hubUrl = "http://127.0.0.1:8787"
+token = "asp_PASTE_PRODUCER_TOKEN"
+
+# Backends hold the upstream API. protocol must be one of:
+#   openai     — OpenAI Chat Completions compatible (OpenAI/Ollama/vLLM/LM Studio);
+#                baseUrl includes /v1, e.g. http://127.0.0.1:11434/v1
+#   anthropic  — Anthropic Messages API;
+#                baseUrl excludes /v1 (the agent appends it), e.g. https://api.anthropic.com
+#   responses  — OpenAI Responses API; baseUrl follows the openai convention,
+#                e.g. https://open.bigmodel.cn/api/v1
+[[backends]]
+id = "ollama"
+protocol = "openai"
+baseUrl = "http://127.0.0.1:11434/v1"
+# keyRef = "ollama-key"     # optional; keys live in secrets.json
+
+[[backends]]
+id = "anthropic"
+protocol = "anthropic"
+baseUrl = "https://api.anthropic.com"
+keyRef = "anthropic-key"
+
+[[backends]]
+id = "openai"
+protocol = "openai"
+baseUrl = "https://api.openai.com/v1"
+keyRef = "openai-key"
+
+# Offerings map a public alias (namespace/name) to a backend model — exactly one
+# upstream model per offering; consumers call the alias and can never pick another model.
+# The namespace must match your producer name on the hub.
+[[offerings]]
+alias = "YOUR_NAME/qwen2.5.7b"
+backend = "ollama"
+upstreamModel = "qwen2.5:7b"   # must match 'ollama list' exactly, including the tag
+maxConcurrency = 1             # start at 1 for local models
+# maxConcurrentUsers = 3       # distinct concurrent consumers on this alias (hub default 3)
+# dailyTokens = 1000000        # shared tokens per UTC day (hub default 1M; 0 = unlimited)
+
+[[offerings]]
+alias = "YOUR_NAME/gpt-4o"
+backend = "openai"
+upstreamModel = "gpt-4o-2024-11-20"
+maxConcurrency = 4
+
+[[offerings]]
+alias = "YOUR_NAME/claude"
+backend = "anthropic"
+upstreamModel = "claude-sonnet-4-5"
+maxConcurrency = 2
