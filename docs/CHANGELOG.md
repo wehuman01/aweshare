@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-08-24
+
+### Changed
+
+- **`aweshare hub invite` now defaults `--expires-in` to 7d** — an unexpiring one-time secret was the silent default before; codes now live 7 days unless the operator spells another duration (`90s/30m/12h/7d`). The admin REST API is unchanged: omitting `expiresAt` there still mints a code with no expiry, for operators who deliberately want one.
+
+- **`aweshare consumer list` now shows both per-offering concurrency caps** — the `USERS` column is renamed `MAX USERS` (still `maxConcurrentUsers`, the distinct-consumer cap) and a new `PER USER` column shows `maxConcurrencyPerUser` (concurrent requests per consumer; `-` on pre-v0.5 hubs that don't report it). `--json` already included both fields.
+
+- **`maxConcurrency` is now `maxConcurrencyPerUser`** (breaking, wire v2) — the per-offering concurrency cap is now per **consumer** instead of per alias: a user hitting their own cap gets 429 `PRODUCER_MAX_CONCURRENCY` while other consumers proceed unaffected; the alias-wide bound becomes `maxConcurrentUsers × maxConcurrencyPerUser`. Renamed everywhere: config key, register message, DB column (`offerings.max_concurrency` → `max_concurrency_per_user`, schema v10), catalog field. A config still using the old `maxConcurrency` key fails validation with a rename hint. WIRE_VERSION bumped to 2 — mixed old/new hub+agent pairs refuse to pair with a clear mismatch error instead of silently applying default caps.
+
 ## [0.4.2] - 2026-08-24
 
 ### Added

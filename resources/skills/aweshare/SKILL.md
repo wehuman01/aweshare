@@ -23,7 +23,7 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare producer init [--hub URL] [--token asp_...]` — write config template + empty secrets (no-op if they exist)
 - `aweshare producer config edit` — open config in `$VISUAL`/`$EDITOR`/`vi`
 - `aweshare hub init`
-- `aweshare hub invite [--role producer|consumer] [--name NAME] [--count N] [--expires-in 7d]` — mint one-time invite codes (`asi_…`, printed once; re-view with `hub list --reveal`); consumers need `--role consumer --name NAME`
+- `aweshare hub invite [--role producer|consumer] [--name NAME] [--count N] [--expires-in D]` — mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `hub list --reveal`); consumers need `--role consumer --name NAME`
 - `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]` — show (bare), merge or clear one consumer's limit overrides
 - `aweshare hub revoke --id N`, `aweshare hub restore --id N` — kill / revive an invite; a redeemed one carries its identity (producer or consumer) with it
 - `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config

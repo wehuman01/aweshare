@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.2-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.3-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -219,21 +219,22 @@ keyRef = "glm-key"                       # e.g. a GLM coding-plan key (Codex-rea
 alias = "peng/qwen2.5.7b"                # namespace must be your producer name
 backend = "ollama"
 upstreamModel = "qwen2.5:7b"             # the real backend id (full tag from `ollama list`)
-maxConcurrency = 1                       # start at 1 for local models; raise for cloud APIs
+maxConcurrencyPerUser = 1                # concurrent requests per consumer on this alias
 # maxConcurrentUsers = 3                 # distinct concurrent consumers (hub default 3)
 # dailyTokens = 1000000                  # shared tokens per UTC day (default 1M; 0 = unlimited)
 ```
 
 One offering exposes exactly one upstream model: consumers call the alias and the hub rewrites the request's model to `upstreamModel` before dispatch — they can never pick another model. To share more models, add more `[[offerings]]`.
 
-**Per-offering usage caps** ride along in the same block; both are optional and enforced by the hub (defaults apply when unset, including for agents that predate them):
+**Per-offering usage caps** ride along in the same block; the optional two are enforced by the hub (defaults apply when unset, including for agents that predate them):
 
 | Key | Default | Meaning | Enforcement |
 |---|---|---|---|
+| `maxConcurrencyPerUser` | 1 | concurrent requests **per consumer** on this alias | 429 `PRODUCER_MAX_CONCURRENCY` |
 | `maxConcurrentUsers` | 3 | distinct consumers with a request in flight on this alias | 429 `PRODUCER_MAX_USERS` |
 | `dailyTokens` | 1000000 | tokens (prompt + completion) shared across all consumers on this alias, per UTC day; `0` = unlimited | 429 `QUOTA_EXCEEDED` (resets at UTC midnight) |
 
-`maxConcurrency` caps in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a single consumer firing 5 parallel requests needs `maxConcurrency ≥ 5` but still counts as one user. Daily caps count recorded usage (see "Honest limits" below).
+`maxConcurrencyPerUser` caps each consumer's in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a consumer firing 5 parallel requests needs `maxConcurrencyPerUser ≥ 5` for itself alone, while the total on the alias is bounded by `maxConcurrentUsers × maxConcurrencyPerUser`. Daily caps count recorded usage (see "Honest limits" below). (Renamed in v0.5 from `maxConcurrency`, which capped the alias's total in-flight requests.)
 
 Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; keep `secrets.json` at 0600 and out of git/screenshots; rotate on suspected leaks. Before sharing, check the upstream's terms: account rules, subscription limits, forwarding and commercial-use constraints.
 
@@ -284,7 +285,7 @@ Both sides at a glance — details in the sections above.
 |---|---|
 | `aweshare hub init` | create data dir + admin token (printed once) |
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
-| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in 7d]` | mint one-time invite codes (`asi_…`, printed once; re-view with `list --reveal`); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
+| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `list --reveal`); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
 | `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` the minted tokens), or the producer/consumer rosters with status and last seen |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
 | `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | recent requests, newest first — one row per request, zero content stored |

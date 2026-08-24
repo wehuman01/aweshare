@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.2-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.3-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -218,21 +218,22 @@ keyRef = "glm-key"                       # 例如 GLM coding plan 的 key（Code
 alias = "peng/qwen2.5.7b"                # 命名空间必须是你的生产者 name
 backend = "ollama"
 upstreamModel = "qwen2.5:7b"             # 必须是后端真实 ID（ollama list 的完整 tag）
-maxConcurrency = 1                       # 本地模型从 1 起步，云端 API 可调高
+maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并发请求数
 # maxConcurrentUsers = 3                 # 同时在用的不同消费者数（hub 默认 3）
 # dailyTokens = 1000000                  # 每日共享 token 额度（UTC 日，默认 100 万；0 = 无上限）
 ```
 
 一条 offering 恰好暴露一个上游模型：消费者调用别名，hub 在转发前把请求里的 model 强制改写为 `upstreamModel`——他们永远无法选用其他模型。想多开放模型就多写几条 `[[offerings]]`。
 
-**按别名的用量约束**写在同一段里，两项都可选、由 hub 执行（未设置时套默认值，包括旧版 agent 未上传的场景）：
+**按别名的用量约束**写在同一段里，后两项可选、由 hub 执行（未设置时套默认值，包括旧版 agent 未上传的场景）：
 
 | 键 | 默认 | 含义 | 执行 |
 |---|---|---|---|
+| `maxConcurrencyPerUser` | 1 | **单个消费者**在该别名上的并发请求数上限 | 429 `PRODUCER_MAX_CONCURRENCY` |
 | `maxConcurrentUsers` | 3 | 该别名上同时有进行中请求的**不同消费者数**上限 | 429 `PRODUCER_MAX_USERS` |
 | `dailyTokens` | 1000000 | 该别名每 **UTC 日**跨消费者合计的 token（prompt+completion）额度；`0` = 无上限 | 429 `QUOTA_EXCEEDED`（UTC 午夜重置） |
 
-`maxConcurrency` 限的是并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——一个消费者并发发 5 个请求需要 `maxConcurrency ≥ 5`，但仍然只算一个用户。日额度统计已记录用量（见下文「诚实的限制」）。
+`maxConcurrencyPerUser` 限的是每个消费者的并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——某消费者要并发发 5 个请求需要自己的 `maxConcurrencyPerUser ≥ 5`；该别名的总并发理论上限是 `maxConcurrentUsers × maxConcurrencyPerUser`。日额度统计已记录用量（见下文「诚实的限制」）。（v0.5 由 `maxConcurrency` 改名而来，旧键限的是别名总并发。）
 
 密钥卫生：用专用最小权限、可撤销、带预算告警的 key；`secrets.json` 保持 0600、不进 git/截图；疑似泄露立即轮换。共享权利自查：账号条款、订阅限制、转发与商用约束。
 
@@ -283,7 +284,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
-| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in 7d]` | 铸造一次性邀请码（`asi_…`，只打印一次；可用 `list --reveal` 重新查看）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
+| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `list --reveal` 重新查看）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
 | `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | 查看 hub 状态：邀请码生命周期（ROLE + 谁兑换的，`--reveal` 显码、`--token` 显示换出的令牌），或 producers/consumers 名册（状态 + 最近活跃） |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
 | `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | 最近请求用量，新在前——每请求一行，内容零落库 |
