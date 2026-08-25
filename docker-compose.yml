@@ -6,7 +6,10 @@ services:
     # build: .
     restart: unless-stopped
     ports:
-      - '8787:8787'
+      # loopback only — put Caddy/nginx TLS in front (see README) and change to
+      # '8787:8787' only on trusted networks, never on a public VPS: plaintext
+      # 8787 would carry every token in the clear
+      - '127.0.0.1:8787:8787'
     volumes:
       - ./data:/data
     environment:

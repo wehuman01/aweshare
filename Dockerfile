@@ -28,6 +28,11 @@ COPY --from=build /app/packages/protocol/package.json ./packages/protocol/
 COPY --from=build /app/packages/protocol/dist ./packages/protocol/dist
 COPY --from=build /app/packages/producer-core/package.json ./packages/producer-core/
 COPY --from=build /app/packages/producer-core/dist ./packages/producer-core/dist
+# producer-core/dist imports 'aweshare-protocol' bare (the inliner that rewrites
+# it to a relative path runs only in the root build, not per-app --filter), and
+# ESM resolves that from the importer's own path — apps/hub/node_modules is not
+# on that path. Ship the pnpm symlink dir so packages-side code resolves too.
+COPY --from=build /app/packages/producer-core/node_modules ./packages/producer-core/node_modules
 COPY --from=build /app/apps/hub/node_modules ./apps/hub/node_modules
 COPY --from=build /app/apps/hub/dist ./apps/hub/dist
 COPY --from=build /app/apps/hub/package.json ./apps/hub/

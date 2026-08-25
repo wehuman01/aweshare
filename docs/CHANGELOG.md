@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-08-25
+
+### Fixed
+
+- **Docker image crashed at startup (`ERR_MODULE_NOT_FOUND: Cannot find package 'aweshare-protocol'`)** — the v0.4.5 image omitted `packages/producer-core/node_modules`, so the bare `aweshare-protocol` import in `producer-core/dist/catalog.js` (loaded at startup by the new hub-local producer) could not resolve from its own path; the container crash-looped. The image now ships the pnpm symlink dir. npm installs were unaffected — the published tarball inlines that import to a relative path.
+- **`docker-compose.yml` published `8787:8787` on all interfaces** — plaintext hub on a public VPS. Now binds `127.0.0.1:8787:8787`, matching the README's TLS-fronting guidance; change it back only on trusted networks.
+
+### Changed
+
+- **Release gate: images are smoke-tested before push** — `release.yml` now builds the image, boots it, and requires `GET /healthz` to answer before anything reaches ghcr (this exact bug would have been caught at the gate). Both build steps also share a persistent GHA layer cache, so routine releases with an unchanged lockfile skip most of the (QEMU-heavy) rebuild.
+
 ## [0.4.5] - 2026-08-25
 
 ### Added

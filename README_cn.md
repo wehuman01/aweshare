@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.5-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.6-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -350,6 +350,8 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 健康：Agent 心跳 15s，静默 45s 判死；后端 AUTH/QUOTA 连败 2 次自动降级（别名对消费者显示 degraded，停止派发），30s 探测恢复。同一生产者令牌新连接替换旧连接（latest-wins）。
 
 升级 npm 安装：`aweshare self-update`（安装前会确认；`--check` 只看版本不改动）。npm 上有新版本时，CLI 每天最多提醒一次。
+
+升级 Docker 部署：`docker compose pull && docker compose up -d`。数据都在 `./data` 卷里不受影响；重启期间 producer 会自动重连，consumer 只在短暂的重启窗口内看到 503。
 
 ## 已知限制（v1）
 
