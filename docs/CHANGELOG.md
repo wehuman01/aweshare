@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-08-25
+
+### Added
+
+- **Usage visibility for producers and hub operators: `aweshare producer usage [summary]` and `hub usage summary`** — producers could not see who consumes their models, and the hub's usage view was a flat newest-first log that cannot answer "who used the most". The producer-side command shows the request log scoped to its own models (rows name the consumer) plus a server-side aggregate per consumer or per alias; `aweshare hub usage summary --since 7d` aggregates consumption per producer × consumer (default) or per alias — requests, errors, rate, best-effort token totals, unknown-token count, mean duration, busiest first (`--since` is required: aggregates need an explicit window). New `GET /admin/v1/usage/summary` carries the same role slices as the detail log (admin everything, producer/consumer their own); usage rows now join consumer/producer names, the detail view gains `--producer` and per-consumer filtering for producer keys, and token counts the upstream never reported render as UNK rows instead of zero.
+
+### Fixed
+
+- **`aweshare hub status` crashed with `input.offerings.filter is not a function`** — broken since the command was introduced: the CLI parsed `GET /admin/v1/offerings` as a bare array, but the endpoint wraps its rows (`{object: "offerings", offerings: [...]}`). The CLI now unwraps; covered by a new e2e test that runs the real CLI dist against a live hub.
+
 ## [0.4.6] - 2026-08-25
 
 ### Fixed

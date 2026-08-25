@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.6-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.7-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -278,11 +278,11 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 | `GET /v1/catalog` | every offering on the hub — producer, alias, protocol, status, the per-offering caps, live in-flight occupancy (`activeUsers`/`activeRequests`) and today's used/remaining tokens (discovery view for `aweshare consumer list`) |
 | `GET /healthz` | liveness |
 | `GET /admin/v1/offerings` | registered offerings with live status, caps, in-flight occupancy and today's used tokens — admin sees everything, a producer token only its own slice (`aweshare producer list`) |
-| `/admin/v1/*` | token/limit/usage management (admin or producer token) · consumer limit overrides: `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits` (admin only) |
+| `/admin/v1/*` | token/limit/usage management (admin or producer token) · usage: `GET /admin/v1/usage` (newest-first log) and `GET /admin/v1/usage/summary` (`group=consumer\|alias`, `since=30m\|12h\|7d`, `consumer`/`producer`/`alias` filters; every role sees its own slice) · consumer limit overrides: `GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits` (admin only) |
 
 Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`PRODUCER_MAX_USERS` = distinct-consumer cap; `QUOTA_EXCEEDED` = lifetime or daily token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
 
-Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. Usage is queried with `aweshare hub usage` or `GET /admin/v1/usage` (admin sees everything, producers and consumers their own slice).
+Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. The log is queried with `aweshare hub usage` or `GET /admin/v1/usage` (admin sees everything, producers and consumers their own slice; rows carry the consumer/producer names). For "who used how much", `aweshare hub usage summary --since 7d` (or `GET /admin/v1/usage/summary`) aggregates server-side on the hub's SQLite: one row per producer × consumer (`--group-by consumer`, the default) or per alias (`--group-by alias`) with request/error counts, best-effort token totals, an explicit unknown-token count (streaming backends that report no counts) and mean duration — busiest first. A producer sees its own slice the same way with `aweshare producer usage [summary]` on its own machine.
 
 ## Command reference
 
@@ -298,7 +298,7 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `list --reveal`); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
 | `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` the minted tokens), or the producer/consumer rosters with status and last seen |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
-| `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` | recent requests, newest first — one row per request, zero content stored |
+| `aweshare hub usage [summary] [--consumer NAME] [--producer NAME] [--alias ns/model] [--limit N] [--group-by consumer\|alias] [--since 7d] [--json]` | request log (default): newest first, one row per request, zero content stored, says which consumer made each call · `summary`: server-side aggregate per producer × consumer (default) or per alias — requests, errors, rate, best-effort token totals, unknown-token count, mean duration; `--since` (30m, 12h, 7d, …) required |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
 
 Token issuance runs through invites (both roles). `limits` and `usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too.
@@ -314,6 +314,7 @@ Token issuance runs through invites (both roles). `limits` and `usage` are thin 
 | `aweshare producer config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
 | `aweshare producer doctor [--status]` | diagnose end to end: background instance, config, backend probes, hub (including how many of your offerings are registered), recent log (`--status` skips the network probes for an instant answer) |
 | `aweshare producer list [--json]` | what this producer has registered on the hub — alias, protocol, live status, caps, live occupancy (`IN USE`, distinct consumers in flight right now), today's token use — plus the local background instance state and drift against config.toml (hubUrl/token come from config.toml) |
+| `aweshare producer usage [summary] [--consumer NAME] [--alias ns/model] [--limit N] [--group-by consumer\|alias] [--since 7d] [--json]` | who used this producer's models (the producer token scopes the hub's metering to its own slice): request log (default), newest first with the consumer named per call, or `summary` aggregated per consumer (default) or per alias — requests, errors, rate, best-effort token totals, unknown-token count, mean duration; `--since` required |
 | `aweshare producer start [--background]` | connect and relay (long-running; `--background` detaches it — logs to `~/.aweshare/producer.log`, pid to `producer.pid`) |
 | `aweshare producer reload` | signal the background producer (SIGHUP) to re-read `config.toml` + `secrets.json` and re-register its offerings on the open tunnel — no disconnect; a broken config keeps the previous values |
 | `aweshare producer stop` | stop the background producer (SIGTERM, SIGKILL after 10s) and clean up its pidfile |
