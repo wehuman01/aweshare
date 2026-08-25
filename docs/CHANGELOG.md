@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-08-25
+
+### Added
+
+- **Live channel occupancy: `IN USE` column in `aweshare consumer list` and `producer list`** — both listings now show, per alias, how many distinct consumers have a request in flight right now, against the cap (`n/max`, e.g. `2/3`; an alias at `max/max` turns a new consumer away with 429 `PRODUCER_MAX_USERS`, so pick one below its cap when a channel is busy). `GET /v1/catalog` and `GET /admin/v1/offerings` report the same snapshot as `activeUsers` plus `activeRequests` (total in-flight requests, diagnosis signal); `--json` carries both. The number is a snapshot at list time, not a reservation — it can change between listing and calling. Older hubs don't report the fields; the column shows `-` (like `PER USER` on pre-v0.4.3 hubs). No wire-protocol change.
+
+- **Hub-hosted models: `aweshare hub produce`** — the hub can now attach models itself, no producer machine needed. `[[backends]]` and `[[offerings]]` sections in the hub's own `config.toml` (same format as a producer's config; alias namespace `hub/…`, bare names auto-prefixed) register under the built-in producer `hub`, with upstream keys in `secrets.json` next to the config. Consumer requests to `hub/*` offerings are served by the hub process directly — in-process upstream fetch, no tunnel and no self-dial; the response streams straight back over the consumer's HTTP connection. Everything guardrail-side applies unchanged: per-offering caps, daily tokens, consumer limits, usage metering (`producer_id = 0`), catalog status with AUTH/QUOTA auto-degrade and 30s recovery probes. The built-in producer is not an identity (empty token hash), carries no invite, and never counts against `AWESHARE_MAX_PRODUCERS`; the name `hub` is reserved for it, and it appears in `hub list producers` — status `built-in` — only while it carries offerings. `produce` is an explicit entry point over the same runner as `serve` (the catalog is config-driven either way); catalog and key edits hot-reload via the existing 2s stat-poll, and a broken catalog fails startup or keeps the previous values on reload. Internally the producer runtime (upstream fetch/stream, adapter conventions, health gate, catalog validation) moved into a shared `aweshare-producer-core` package used by both the agent and the hub — agent behavior is unchanged.
+
 ## [0.4.4] - 2026-08-25
 
 ### Added

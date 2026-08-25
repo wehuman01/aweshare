@@ -7,7 +7,7 @@ aweshare is intentionally narrow: an open-source, local-first relay where produc
 The v1 design (`docs/specs/2026-08-15-aweshare-design.md`) deliberately excludes the following. Pull requests adding them will be declined — if you believe the fence is wrong, open an issue and argue it there first:
 
 - payments, credits, withdrawals, rate multipliers
-- cross-protocol conversion (anthropic↔openai↔responses) — an alias speaks exactly one wire protocol; relaying within a protocol family (chat completions, messages, responses) is fine
+- cross-protocol conversion (anthropic↔openai↔responses) — each registration speaks exactly one wire protocol (an alias may register one offering per protocol); relaying within a protocol family (chat completions, messages, responses) is fine
 - smart routing, load balancing, failover across producers (namespaced aliases make routing a deterministic lookup — there is nothing to be smart about)
 - web console, accounts, signup/login
 - tool-config rewriting assistants (consumers configure via env vars; see README)
@@ -33,7 +33,7 @@ In practice: plain exported functions over classes (custom `Error` subclasses ar
 
 ```bash
 pnpm install
-pnpm test        # 83 tests across 14 files
+pnpm test        # vitest, whole suite
 pnpm build       # tsc -b, whole monorepo
 pnpm check       # biome (format + lint)
 ```
@@ -41,14 +41,17 @@ pnpm check       # biome (format + lint)
 Node ≥ 22, pnpm ≥ 11. The layout:
 
 ```
-packages/protocol   shared wire protocol: binary frame codec, control messages,
-                    alias rules, error codes (used by hub, agent and consumer)
-apps/hub            node:http + ws + better-sqlite3; consumer endpoints, tunnel
-                    server, admin API, aweshare hub CLI
-apps/agent          aweshare producer CLI: config/secrets, protocol adapters,
-                    tunnel client with reconnect, health gate, doctor
-apps/consumer       aweshare consumer CLI: invite redeem (join) that prints
-                    the asc_ token once with ready-to-paste SDK env vars
+packages/protocol       shared wire protocol: binary frame codec, control messages,
+                        alias rules, error codes (used by hub, agent and consumer)
+packages/producer-core  shared producer runtime: catalog validation, upstream
+                        adapters, health gate, request execution (used by the
+                        agent and the hub's own models — README "Hub-hosted models")
+apps/hub                node:http + ws + better-sqlite3; consumer endpoints, tunnel
+                        server, admin API, aweshare hub CLI
+apps/agent              aweshare producer CLI: config/secrets, tunnel client with
+                        reconnect, doctor
+apps/consumer           aweshare consumer CLI: invite redeem (join) that prints
+                        the asc_ token once with ready-to-paste SDK env vars
 ```
 
 ## Testing expectations
@@ -64,4 +67,4 @@ apps/consumer       aweshare consumer CLI: invite redeem (join) that prints
 ## Security notes for contributors
 
 - Never add logging, caching, or persistence of request/response content — the "hub sees plaintext but stores nothing" boundary is documented in the README and must hold.
-- Upstream API keys are handled only in `apps/agent` (secrets.json → adapter injection). Any change that moves key material closer to the hub needs a design discussion first.
+- Upstream API keys are handled only by the process that dials the upstream: the producer agent (`~/.aweshare/secrets.json`) for shared models, and the hub itself (`<dataDir>/secrets.json`) for hub-hosted models (`aweshare hub produce` — the operator shares their own keys from the same process). Keys are injected at dispatch time and never cross the tunnel in either direction. Any change that moves key material across that boundary needs a design discussion first.

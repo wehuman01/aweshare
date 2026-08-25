@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.4-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.5-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -77,6 +77,12 @@
 npm install -g aweshare
 aweshare hub init        # 数据在 ~/.aweshare-hub；打印 admin token，抄下来
 aweshare hub serve       # 监听 :8787（前面套 Caddy/nginx 做 TLS）
+```
+
+hub 自己也能挂模型，不需要 producer 机器：在 `~/.aweshare-hub/config.toml` 里加 `[[backends]]`/`[[offerings]]` 段（格式与 producer 配置相同，别名命名空间 `hub/…`），上游 key 放 `~/.aweshare-hub/secrets.json`，然后：
+
+```bash
+aweshare hub produce    # serve + hub 自有模型；消费者照常调 hub/<name>
 ```
 
 **docker**：
@@ -225,6 +231,8 @@ maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并�
 
 一条 offering 恰好暴露一个上游模型：消费者调用别名，hub 在转发前把请求里的 model 强制改写为 `upstreamModel`——他们永远无法选用其他模型。想多开放模型就多写几条 `[[offerings]]`。
 
+一个别名也可以同时说多种线上协议：把 `backend = "…"` 换成列表 `backends = ["a", "b"]`，该块会按 backend 各注册一条 offering。注册以 `别名 + 协议` 为键，因此列出的 backend 协议必须互不相同（重复会被 hub 拒绝）；不做任何协议转换——每条注册只走自己的线上协议。消费者用任意 SDK 调同一个别名即可，`producer list` / `consumer list` 会把多协议行合并成一条显示。
+
 **按别名的用量约束**写在同一段里，后两项可选、由 hub 执行（未设置时套默认值，包括旧版 agent 未上传的场景）：
 
 | 键 | 默认 | 含义 | 执行 |
@@ -266,9 +274,9 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `POST /v1/chat/completions` · `POST /v1/messages` · `POST /v1/responses` | 推理入口（Bearer 或 `x-api-key`） |
 | `GET /v1/models` | hub 上已注册的全部别名与状态 |
-| `GET /v1/catalog` | hub 全部 offering——生产者、别名、协议、状态、按别名的限额及当日已用/剩余 token（`aweshare consumer list` 的发现视图） |
+| `GET /v1/catalog` | hub 全部 offering——生产者、别名、协议、状态、按别名的限额、即时在途占用（`activeUsers`/`activeRequests`）及当日已用/剩余 token（`aweshare consumer list` 的发现视图） |
 | `GET /healthz` | 存活探测 |
-| `GET /admin/v1/offerings` | 已注册 offerings 及实时状态、限额、当日已用 token——admin 全量，生产者令牌只看自己那份（`aweshare producer list`） |
+| `GET /admin/v1/offerings` | 已注册 offerings 及实时状态、限额、即时在途占用、当日已用 token——admin 全量，生产者令牌只看自己那份（`aweshare producer list`） |
 | `/admin/v1/*` | 令牌/限额/用量管理（admin 或生产者令牌）· 消费者限制覆盖：`GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`（仅 admin） |
 
 错误语义：`401` 无效密钥 · `401 TOKEN_REVOKED` 令牌被挂起（请联系运维者 restore） · `403 HUB_FULL` 生产者容量已满 · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`PRODUCER_MAX_USERS` = 不同消费者数上限；`QUOTA_EXCEEDED` = 终身或每日 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
@@ -285,6 +293,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
+| `aweshare hub produce [--host H] [--port N]` | 启动 hub 并挂上自有模型——与 `serve` 同一进程；hub config.toml 的 `[[backends]]`/`[[offerings]]` 段注册为 `hub/…` offering，由 hub 进程直接服务（key 在数据目录的 secrets.json；改动热加载） |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `list --reveal` 重新查看）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
 | `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | 查看 hub 状态：邀请码生命周期（ROLE + 谁兑换的，`--reveal` 显码、`--token` 显示换出的令牌），或 producers/consumers 名册（状态 + 最近活跃） |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
@@ -303,7 +312,7 @@ list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 | `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` | 兑换邀请码得到 producer 令牌并写入配置（不绑定码需 `--name`/`--email`；先探测 hub——局域网以外的明文 HTTP 需 `--allow-http`） |
 | `aweshare producer config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
 | `aweshare producer doctor [--status]` | 端到端诊断：后台实例、配置、后端探测、hub（含你的 offerings 有多少已注册）、最近日志（`--status` 跳过网络探测，秒回） |
-| `aweshare producer list [--json]` | 查看本 producer 在 hub 上注册了什么——别名、协议、实时状态、限额、当日 token 用量——外加本地后台实例状态与和 config.toml 的漂移（hubUrl/token 取自 config.toml） |
+| `aweshare producer list [--json]` | 查看本 producer 在 hub 上注册了什么——别名、协议、实时状态、限额、即时占用（`IN USE`，此刻在用的不同消费者数）、当日 token 用量——外加本地后台实例状态与和 config.toml 的漂移（hubUrl/token 取自 config.toml） |
 | `aweshare producer start [--background]` | 连接并转发（长驻进程；`--background` 转入后台——日志写 `~/.aweshare/producer.log`，pid 写 `producer.pid`） |
 | `aweshare producer reload` | 通知后台 producer（SIGHUP）重读 `config.toml` + `secrets.json`，并在既有隧道上重新注册 offerings——不断连；配置有误时保留旧值继续服务 |
 | `aweshare producer stop` | 停止后台 producer（SIGTERM，10 秒后 SIGKILL）并清理 pidfile |
@@ -313,7 +322,7 @@ list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 | 命令 | 用途 |
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list --token` 找回） |
-| `aweshare consumer list --hub URL --token asc_… [--json]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额及当日剩余 token |
+| `aweshare consumer list --hub URL --token asc_… [--json]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 
@@ -324,6 +333,8 @@ CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--chec
 hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Docker 内是 `/data/config.toml`）。`aweshare hub init` 会生成模板，全部键注释着——取消注释即覆盖默认值。键名与下表同义、用 camelCase（`consumerRps`、`headTimeoutMs`…）。优先级：`serve` 参数（`--host`/`--port`）> 环境变量 > config.toml > 默认值。文件有问题（非法 TOML、未知键、非正数值）启动即报错并指名键；`AWESHARE_HUB_DATA_DIR` 本身只能用环境变量（它决定文件在哪）。
 
 **热加载**：除 host/port 外，表中所有可调参数都支持运行中 `SIGHUP` 生效（`kill -HUP <pid>`；Docker 用 `docker kill -s HUP aweshare-hub`）——先校验新文件，写坏了只记日志、继续用旧值服务。环境变量在进程启动时就固定了，被 `AWESHARE_*` 钉住的键不受重载影响（与启动时同一优先级）；host/port 仍需重启。生产者侧的 offerings 与限额用 `aweshare producer reload` 热加载。
+
+**hub 自挂模型（`hub produce`）**：同一份 config.toml 可以带 `[[backends]]` 和 `[[offerings]]` 段（producer 格式；别名命名空间 `hub/…`，裸名自动补前缀），上游 key 放同目录的 `secrets.json`（chmod 600）。这些 offering 在目录里挂在 producer `hub` 名下，由 hub 进程直接转发——不走隧道，也不占 `AWESHARE_MAX_PRODUCERS` 席位。限额（`maxConcurrencyPerUser`、`maxConcurrentUsers`、`dailyTokens`）、用量计量和 consumer 限额与远端 producer 完全一致。内置 producer `hub` 不是身份（无令牌、无邀请码、不可撤销）；只有在它名下确实挂着 offering 时才出现在 `hub list producers` 里，状态显示为 `built-in`。目录与 key 改动像其他参数一样热加载；写坏了保留旧目录并记日志。
 
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
@@ -366,7 +377,7 @@ aweshare producer doctor
 
 发布：push 一个 `v*` tag（`docs/CHANGELOG.md` 需有对应 `## [x.y.z]` 小节），CI 通过 Trusted Publishing（OIDC，无需 token secret）自动发布 `aweshare` 到 npm，推送 Docker 镜像到 `ghcr.io/wehuman01/aweshare`，并将用户文档同步到公开仓库 wehuman01/aweshare。
 
-结构：`packages/protocol`（线协议共享包）· `apps/hub`（HTTP+WS+SQLite+CLI）· `apps/agent`（CLI）。设计文档在 `docs/specs/`，变更记录在 `docs/CHANGELOG.md`，贡献范围见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+结构：`packages/protocol`（线协议共享包）· `packages/producer-core`（生产者运行时共享包）· `apps/hub`（HTTP+WS+SQLite+CLI）· `apps/agent`（CLI）。设计文档在 `docs/specs/`，变更记录在 `docs/CHANGELOG.md`，贡献范围见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ## 支持我们
 

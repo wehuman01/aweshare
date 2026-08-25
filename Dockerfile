@@ -5,17 +5,19 @@ RUN corepack enable
 # the lockfile must come along for --frozen-lockfile
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/protocol/package.json packages/protocol/
+COPY packages/producer-core/package.json packages/producer-core/
 COPY apps/hub/package.json apps/hub/
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json tsconfig.json ./
 COPY packages/protocol packages/protocol
+COPY packages/producer-core packages/producer-core
 COPY apps/hub apps/hub
 RUN pnpm --filter @aweshare/hub... build
 
-# run stage — the hub resolves aweshare-protocol through apps/hub/node_modules,
-# whose workspace symlink targets /app/packages/protocol, so it must ship too.
-# (No prune step: pnpm prune is interactive/unsupported under --filter in workspaces,
-# so devDependencies of the root ride along.)
+# run stage — the hub resolves aweshare-protocol and aweshare-producer-core
+# through apps/hub/node_modules, whose workspace symlinks target /app/packages,
+# so both must ship. (No prune step: pnpm prune is interactive/unsupported
+# under --filter in workspaces, so devDependencies of the root ride along.)
 FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production AWESHARE_HUB_DATA_DIR=/data
@@ -24,6 +26,8 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/packages/protocol/package.json ./packages/protocol/
 COPY --from=build /app/packages/protocol/dist ./packages/protocol/dist
+COPY --from=build /app/packages/producer-core/package.json ./packages/producer-core/
+COPY --from=build /app/packages/producer-core/dist ./packages/producer-core/dist
 COPY --from=build /app/apps/hub/node_modules ./apps/hub/node_modules
 COPY --from=build /app/apps/hub/dist ./apps/hub/dist
 COPY --from=build /app/apps/hub/package.json ./apps/hub/
