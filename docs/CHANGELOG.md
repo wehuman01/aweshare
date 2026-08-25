@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-08-25
+
+### Added
+
+- **AI-agent setup guide (`README.ai.md`)** — a bootstrap protocol for AI coding agents (Claude Code, Codex, …): the agent installs the CLI, asks whether you are a hub operator, producer or consumer, and does everything safe to automate — editing configs, minting invites, running `producer doctor`. Steps that print one-time tokens (`hub init`, `consumer join`) or start long-running services (`hub serve`, `producer start`, Docker) stay in your terminal. Both READMEs now carry a "Let an AI agent set it up" section pointing agents at the doc.
+
+### Changed
+
+- **Hub-hosted models moved to `config.produce.toml`** (breaking for `hub produce` operators) — the hub's runtime config and its local model catalog are now separate files: `[[backends]]`/`[[offerings]]` sections (producer format, alias namespace `hub/…`) live in a new `config.produce.toml` in the data dir, and `config.toml` is exclusively hub runtime settings — it now rejects `backends`/`offerings` as unknown keys, so an operator with catalog sections in the old file must move them or the hub fails startup validation naming the key. `hub produce init` creates the produce config template and an empty `secrets.json` (never replacing either); hot-reload and the 2s stat-poll watch the new file; `secrets.json` is unchanged.
+
+- **Docker image publishes linux/amd64 only** — the release workflow drops the QEMU-emulated arm64 half of the multi-arch image (the slowest part of every release); arm64 hosts can still run the amd64 image under emulation.
+
+- Community-hub docs: consumer invites can be redeemed with one `curl` against `/invites/v1/redeem` (no Node needed on that machine), and day-to-day provider switching via [aweswitch](https://github.com/Webioinfo01/aweswitch) profiles is now recommended (EN + 中文).
+
 ## [0.4.8] - 2026-08-25
 
 ### Added

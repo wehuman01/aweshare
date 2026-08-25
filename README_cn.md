@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.8-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.9-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -69,7 +69,19 @@
 
 已发布：npm 包 [`aweshare`](https://www.npmjs.com/package/aweshare)（需 Node ≥ 22）和 Docker 镜像（`ghcr.io/wehuman01/aweshare`），无需 clone 源码。
 
-### 1. 启动 Hub（运维者，一台 VPS）
+### 让 AI agent 代装
+
+在 Claude Code、Codex 或其他编程 agent 里，对它说：
+
+```text
+阅读 https://github.com/wehuman01/aweshare/blob/main/README.ai.md 并按其指引安装和配置 aweshare。
+```
+
+Agent 会安装 CLI 和 skill，先问清你的角色（hub 运营者 / 生产者 / 消费者），然后完成所有可安全自动化的部分——改配置、发邀请码、跑 `producer doctor`。会打印一次性 token 的步骤（`hub init`、`consumer join`）和启动常驻服务的步骤（`hub serve`、`producer start`）留在你自己的终端完成。装好之后可以直接问"把我本地的 Ollama 模型以 peng/qwen2.5.7b 共享出去"、"我的 producer 为什么掉线了"或"这周谁用了我的模型"。
+
+### 手动安装
+
+#### 1. 启动 Hub（运维者，一台 VPS）
 
 **npm**（最简）：
 
@@ -79,7 +91,7 @@ aweshare hub init        # 数据在 ~/.aweshare-hub；打印 admin token，抄�
 aweshare hub serve       # 监听 :8787（前面套 Caddy/nginx 做 TLS）
 ```
 
-hub 自己也能挂模型，不需要 producer 机器：在 `~/.aweshare-hub/config.toml` 里加 `[[backends]]`/`[[offerings]]` 段（格式与 producer 配置相同，别名命名空间 `hub/…`），上游 key 放 `~/.aweshare-hub/secrets.json`，然后：
+hub 自己也能挂模型，不需要 producer 机器：在 `~/.aweshare-hub/config.produce.toml` 里加 `[[backends]]`/`[[offerings]]` 段（格式与 producer 配置相同，别名命名空间 `hub/…`），上游 key 放 `~/.aweshare-hub/secrets.json`，然后：
 
 ```bash
 aweshare hub produce    # serve + hub 自有模型；消费者照常调 hub/<name>
@@ -131,7 +143,7 @@ aweshare consumer join --hub https://hub.example.com --code asi_...
 
 **准入完全归运营者**：两种角色统一走一次性邀请码（唯一准入路径，每个身份的全生命周期都带着邀请码这个把手）。兑换成功的消费者密钥可调用 hub 上**全部** offering——放谁进来，谁就能用共享的一切。兜底手段：按消费者的 `hub limits`（限流、并发、token 预算）、按 offering 的限额（`maxConcurrentUsers`、`dailyTokens`）与 `hub revoke` 挂起，全部由 hub 强制执行。
 
-### 2. 生产者首跑（按顺序）
+#### 2. 生产者首跑（按顺序）
 
 ```bash
 npm install -g aweshare   # ⓪ 生产者机器上装一次（Node ≥ 22）
@@ -152,7 +164,7 @@ aweshare producer start            # 前台运行；加 --background 转入后�
 #    用 'aweshare producer stop' 停止
 ```
 
-### 3. 消费者首跑（按顺序）
+#### 3. 消费者首跑（按顺序）
 
 ```bash
 # ⓪ 兑换你的邀请码（操作者直接给 asc_ 密钥的可跳过）
@@ -293,7 +305,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
-| `aweshare hub produce [--host H] [--port N]` | 启动 hub 并挂上自有模型——与 `serve` 同一进程；hub config.toml 的 `[[backends]]`/`[[offerings]]` 段注册为 `hub/…` offering，由 hub 进程直接服务（key 在数据目录的 secrets.json；改动热加载） |
+| `aweshare hub produce [--host H] [--port N]` | 启动 hub 并挂上自有模型——与 `serve` 同一进程；`config.produce.toml` 的 `[[backends]]`/`[[offerings]]` 段注册为 `hub/…` offering，由 hub 进程直接服务（key 在数据目录的 secrets.json；改动热加载） |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `list --reveal` 重新查看）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
 | `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | 查看 hub 状态：邀请码生命周期（ROLE + 谁兑换的，`--reveal` 显码、`--token` 显示换出的令牌），或 producers/consumers 名册（状态 + 最近活跃） |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
@@ -335,7 +347,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 
 **热加载**：除 host/port 外，表中所有可调参数都支持运行中 `SIGHUP` 生效（`kill -HUP <pid>`；Docker 用 `docker kill -s HUP aweshare-hub`）——先校验新文件，写坏了只记日志、继续用旧值服务。环境变量在进程启动时就固定了，被 `AWESHARE_*` 钉住的键不受重载影响（与启动时同一优先级）；host/port 仍需重启。生产者侧的 offerings 与限额用 `aweshare producer reload` 热加载。
 
-**hub 自挂模型（`hub produce`）**：同一份 config.toml 可以带 `[[backends]]` 和 `[[offerings]]` 段（producer 格式；别名命名空间 `hub/…`，裸名自动补前缀），上游 key 放同目录的 `secrets.json`（chmod 600）。这些 offering 在目录里挂在 producer `hub` 名下，由 hub 进程直接转发——不走隧道，也不占 `AWESHARE_MAX_PRODUCERS` 席位。限额（`maxConcurrencyPerUser`、`maxConcurrentUsers`、`dailyTokens`）、用量计量和 consumer 限额与远端 producer 完全一致。内置 producer `hub` 不是身份（无令牌、无邀请码、不可撤销）；只有在它名下确实挂着 offering 时才出现在 `hub list producers` 里，状态显示为 `built-in`。目录与 key 改动像其他参数一样热加载；写坏了保留旧目录并记日志。
+**hub 自挂模型（`hub produce`）**：`config.produce.toml` 放 `[[backends]]` 和 `[[offerings]]` 段（producer 格式；别名命名空间 `hub/…`，裸名自动补前缀），上游 key 放同目录的 `secrets.json`（chmod 600）；`config.toml` 仅保留 Hub 自身运行参数。这些 offering 在目录里挂在 producer `hub` 名下，由 hub 进程直接转发——不走隧道，也不占 `AWESHARE_MAX_PRODUCERS` 席位。限额（`maxConcurrencyPerUser`、`maxConcurrentUsers`、`dailyTokens`）、用量计量和 consumer 限额与远端 producer 完全一致。内置 producer `hub` 不是身份（无令牌、无邀请码、不可撤销）；只有在它名下确实挂着 offering 时才出现在 `hub list producers` 里，状态显示为 `built-in`。目录与 key 改动像其他参数一样热加载；写坏了保留旧目录并记日志。
 
 | 环境变量 | 默认 | 说明 |
 |---|---|---|

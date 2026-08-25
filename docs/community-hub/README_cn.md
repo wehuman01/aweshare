@@ -82,13 +82,21 @@ aweshare producer doctor --status      # pid、uptime、最近日志——秒回
 
 ### 1. 兑换消费者邀请码
 
-任何机器都行——日常使用甚至不需要装 Node：
+兑换要走 aweshare CLI——先安装（Node ≥ 22）：
 
 ```bash
+npm install -g aweshare
 aweshare consumer join --hub https://aweshare.wehuman.top --code asi_...
 ```
 
-它会打印一次你的 `asc_` token 和可直接粘贴的环境变量——**存好**；hub 上只有它的哈希。
+机器上没有 Node 也不想装？一条 curl 也能兑换：
+
+```bash
+curl -s -X POST https://aweshare.wehuman.top/invites/v1/redeem \
+  -H 'content-type: application/json' -d '{"code":"asi_..."}'
+```
+
+不管哪种方式，`asc_` token 都只打印**一次**——存好；hub 上只有它的哈希。
 
 ### 2. 把 SDK 指向 hub
 
@@ -111,6 +119,30 @@ curl https://aweshare.wehuman.top/v1/chat/completions \
 ```
 
 之后把任何支持自定义 OpenAI/Anthropic base URL 的工具指到 hub，模型名填别名即可。
+
+### 推荐工具：用 aweswitch 管理供应商切换
+
+日常使用中，hub 大概率只是你多个 API 供应商之一。[aweswitch](https://github.com/Webioinfo01/aweswitch) 把「agent × 供应商」的每种组合存成命名 profile，启动时注入环境变量、不碰全局配置（`pip3 install aweswitch`，需 Python ≥ 3.9）。走 aweshare 的 profile 就是普通的一条：
+
+```json
+{
+  "profiles": {
+    "api": {
+      "claude": {
+        "cc-aweshare": {
+          "env": {
+            "ANTHROPIC_BASE_URL": "https://aweshare.wehuman.top",
+            "ANTHROPIC_AUTH_TOKEN": "${AWESHARE_ASC_TOKEN}",
+            "ANTHROPIC_MODEL": "peng1/step-flash"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+用 `aweswitch cc-aweshare` 启动；Codex / OpenCode profile 与官方账号登录见 [aweswitch README](https://github.com/Webioinfo01/aweswitch)。
 
 ## 配额与公平使用
 

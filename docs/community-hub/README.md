@@ -82,13 +82,21 @@ Stop with `aweshare producer stop`. When the producer stops or crashes, its alia
 
 ### 1. Redeem your consumer invite
 
-Any machine — you don't even need Node day-to-day:
+Redeeming runs through the aweshare CLI — install it first (Node ≥ 22):
 
 ```bash
+npm install -g aweshare
 aweshare consumer join --hub https://aweshare.wehuman.top --code asi_...
 ```
 
-It prints your `asc_` token **once** with ready-to-paste env vars — save it; the hub stores only a hash.
+No Node on the machine and don't want to install any? One curl redeems too:
+
+```bash
+curl -s -X POST https://aweshare.wehuman.top/invites/v1/redeem \
+  -H 'content-type: application/json' -d '{"code":"asi_..."}'
+```
+
+Either way your `asc_` token is printed **once** — save it; the hub stores only a hash.
 
 ### 2. Point your SDK at the hub
 
@@ -111,6 +119,30 @@ curl https://aweshare.wehuman.top/v1/chat/completions \
 ```
 
 Then point any tool that accepts a custom OpenAI/Anthropic base URL at the hub and pick aliases as model names.
+
+### Recommended: manage provider switching with aweswitch
+
+Day-to-day, the hub will likely be one of several API providers you use. [aweswitch](https://github.com/Webioinfo01/aweswitch) keeps each agent × provider combination as a named profile and launches it without touching global config (`pip3 install aweswitch`, Python ≥ 3.9). An aweshare-backed profile is just another entry:
+
+```json
+{
+  "profiles": {
+    "api": {
+      "claude": {
+        "cc-aweshare": {
+          "env": {
+            "ANTHROPIC_BASE_URL": "https://aweshare.wehuman.top",
+            "ANTHROPIC_AUTH_TOKEN": "${AWESHARE_ASC_TOKEN}",
+            "ANTHROPIC_MODEL": "peng1/step-flash"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Launch it with `aweswitch cc-aweshare`; Codex / OpenCode profiles and official-account logins are covered in the [aweswitch README](https://github.com/Webioinfo01/aweswitch).
 
 ## Caps and fair use
 

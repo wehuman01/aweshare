@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.8-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.9-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -69,7 +69,19 @@ Consumer (standard SDK, zero changes)         Producer side
 
 Published as [`aweshare`](https://www.npmjs.com/package/aweshare) on npm (requires Node ≥ 22) and as a Docker image (`ghcr.io/wehuman01/aweshare`). No clone needed.
 
-### 1. Start the hub (operator, one VPS)
+### Let an AI agent set it up
+
+Working in Claude Code, Codex, or another coding agent? Tell it:
+
+```text
+Read https://github.com/wehuman01/aweshare/blob/main/README.ai.md and follow it to install and configure aweshare.
+```
+
+The agent installs the CLI and the skill, asks whether you are a hub operator, producer, or consumer, and does everything that is safe to automate — editing configs, minting invites, running `producer doctor`. Steps that print one-time tokens (`hub init`, `consumer join`) or start long-running services (`hub serve`, `producer start`) stay in your terminal. After setup you can ask things like "share my local Ollama model as peng/qwen2.5.7b", "why is my producer offline?", or "who used my models this week?".
+
+### Manual setup
+
+#### 1. Start the hub (operator, one VPS)
 
 **npm** (simplest):
 
@@ -79,7 +91,7 @@ aweshare hub init        # data in ~/.aweshare-hub; prints the admin token — s
 aweshare hub serve       # listens on :8787 (put Caddy/nginx TLS in front)
 ```
 
-The hub can also host models itself — no producer machine needed. Add `[[backends]]`/`[[offerings]]` sections to `~/.aweshare-hub/config.toml` (same format as a producer's config, alias namespace `hub/…`), put the upstream keys in `~/.aweshare-hub/secrets.json`, and run:
+The hub can also host models itself — no producer machine needed. Add `[[backends]]`/`[[offerings]]` sections to `~/.aweshare-hub/config.produce.toml` (same format as a producer's config, alias namespace `hub/…`), put the upstream keys in `~/.aweshare-hub/secrets.json`, and run:
 
 ```bash
 aweshare hub produce    # serve + the hub's own models; consumers dial hub/<name> like any offering
@@ -132,7 +144,7 @@ The producer's `name` becomes their alias namespace (the `peng/` in `peng/gpt-4o
 
 The operator owns admission: one-time invite codes for both roles, the only admission path (every identity carries its invite handle for its whole lifecycle). A redeemed consumer key may call **every** offering on the hub — if you let someone in, they can use what is shared. Guardrails: per-consumer `hub limits` (rate, concurrency, token budgets), per-offering caps (`maxConcurrentUsers`, `dailyTokens`) and `hub revoke` suspension, all enforced by the hub.
 
-### 2. Producer first run (in this order)
+#### 2. Producer first run (in this order)
 
 ```bash
 npm install -g aweshare   # ⓪ once, on the producer machine (Node ≥ 22)
@@ -153,7 +165,7 @@ aweshare producer start            # foreground; add --background to detach it
 #    and stopped with 'aweshare producer stop'
 ```
 
-### 3. Consumer first run (in this order)
+#### 3. Consumer first run (in this order)
 
 ```bash
 # ⓪ redeem your invite code (skip if the operator handed you an asc_ key directly)
@@ -294,7 +306,7 @@ Both sides at a glance — details in the sections above.
 |---|---|
 | `aweshare hub init` | create data dir + admin token (printed once) |
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
-| `aweshare hub produce [--host H] [--port N]` | run the hub with its own models attached — same as `serve`; the `[[backends]]`/`[[offerings]]` sections of the hub's config.toml become `hub/…` offerings served in-process (keys in the data dir's secrets.json; edits hot-reload) |
+| `aweshare hub produce [--host H] [--port N]` | run the hub with its own models attached — same as `serve`; the `[[backends]]`/`[[offerings]]` sections of `config.produce.toml` become `hub/…` offerings served in-process (keys in the data dir's secrets.json; edits hot-reload) |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `list --reveal`); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
 | `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` the minted tokens), or the producer/consumer rosters with status and last seen |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
@@ -336,7 +348,7 @@ The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Do
 
 **Hot reload:** every tunable in the table except host/port applies live on `SIGHUP` (`kill -HUP <pid>`; Docker: `docker kill -s HUP aweshare-hub`) — the new file is validated first, and a broken edit is logged while the previous values keep serving. Env vars are fixed at process start, so keys pinned by `AWESHARE_*` ignore the reloaded file (same precedence as startup); host/port need a restart. Producer-side offerings and caps reload via `aweshare producer reload`.
 
-**Hub-hosted models (`hub produce`):** the same config.toml may carry `[[backends]]` and `[[offerings]]` sections (producer format; alias namespace `hub/…` — bare names are auto-prefixed) with upstream keys in `secrets.json` next to it (chmod 600). Those offerings appear in the catalog under producer `hub` and are served by the hub process directly — no tunnel, and they never count against `AWESHARE_MAX_PRODUCERS`. Caps (`maxConcurrencyPerUser`, `maxConcurrentUsers`, `dailyTokens`), usage metering and consumer limits apply exactly as for remote producers. The built-in `hub` producer is not an identity (no token, no invite, cannot be revoked); it appears in `hub list producers` — status `built-in` — only while it carries offerings. Catalog and key edits hot-reload like the tunables; a broken catalog keeps the previous one and is logged.
+**Hub-hosted models (`hub produce`):** `config.produce.toml` carries `[[backends]]` and `[[offerings]]` sections (producer format; alias namespace `hub/…` — bare names are auto-prefixed) with upstream keys in `secrets.json` next to it (chmod 600). `config.toml` remains exclusively for Hub runtime settings. Those offerings appear in the catalog under producer `hub` and are served by the hub process directly — no tunnel, and they never count against `AWESHARE_MAX_PRODUCERS`. Caps (`maxConcurrencyPerUser`, `maxConcurrentUsers`, `dailyTokens`), usage metering and consumer limits apply exactly as for remote producers. The built-in `hub` producer is not an identity (no token, no invite, cannot be revoked); it appears in `hub list producers` — status `built-in` — only while it carries offerings. Catalog and key edits hot-reload like the tunables; a broken catalog keeps the previous one and is logged.
 
 | Env var | Default | Purpose |
 |---|---|---|
