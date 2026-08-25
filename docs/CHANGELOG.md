@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-25
+
+### Added
+
+- **`aweshare producer list --all`** — a producer can now see the whole hub's catalog, not just its own slice: the admin offerings route accepts `?all=true` for producer tokens and the listing renders an extra `PRODUCER` column when the flag is on — the same discovery view `consumer list` gives, minus what only consumers care about. Older hubs ignore the flag.
+
+- **Producer online state: `ONLINE` column in hub listings** — `aweshare hub list producers` (and the admin tokens API behind it) now reports each producer's tunnel liveness, so a stale roster entry is distinguishable from a live one. The built-in `hub` producer counts as online whenever it carries offerings.
+
+### Changed
+
+- **`aweshare consumer list` hides offline offerings by default** — an offline producer's aliases can't be called, so they were noise when picking a model; they are now hidden unless `--all` is passed (degraded offerings stay listed — the producer is up, the upstream is briefly failing). When every offering is offline the table is replaced by a one-line hint suggesting `--all`; `--json` follows the same filtering.
+
+### Fixed
+
+- **A crash mid schema upgrade no longer bricks the hub** — SQLite migrations now run inside a single transaction: a power loss or kill during an upgrade rolls back to the previous `user_version` and the ladder re-runs cleanly on the next open, instead of leaving half-applied schema blocks (duplicate column, leftover temp table) that fail every later startup.
+- **The detached producer daemon survives crashing requests** — a bug inside a request job now logs an error and settles the job instead of raising an unhandled rejection that killed the whole background producer; the backpressure wait loop also exits once the tunnel socket is dead instead of sleeping forever, and the pidfile liveness check anchors on the trailing `start` argument so a recycled pid can never SIGKILL an unrelated `aweshare` command.
+- **Hub and producer fail loudly where they used to fail quietly** — hub bind errors surface at `listen` (a taken port no longer looks like a silent no-op start), `--host` values are validated from env and config, `--since` windows get range checks, `config edit` reports an unlaunchable `$EDITOR` as a clean message, and `producer config show` redacts single-quoted `token = '…'` lines just like the double-quoted form (`producer init --hub/--token` now escape TOML special characters instead of writing a broken config).
+- **Stricter upstream and wire validation** — backend `baseUrl`s are validated at catalog load (malformed URLs fail into the request as an error instead of crashing the producer), connect-phase upstream timeouts are classified `BACKEND_TIMEOUT`, and the protocol rejects oversized binary chunk frames on the receiving side. `self-update` pins its npm install to the version it verified.
+
 ## [0.4.9] - 2026-08-25
 
 ### Added

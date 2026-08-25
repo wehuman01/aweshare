@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.9-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -307,7 +307,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
 | `aweshare hub produce [--host H] [--port N]` | 启动 hub 并挂上自有模型——与 `serve` 同一进程；`config.produce.toml` 的 `[[backends]]`/`[[offerings]]` 段注册为 `hub/…` offering，由 hub 进程直接服务（key 在数据目录的 secrets.json；改动热加载） |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `list --reveal` 重新查看）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
-| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | 查看 hub 状态：邀请码生命周期（ROLE + 谁兑换的，`--reveal` 显码、`--token` 显示换出的令牌），或 producers/consumers 名册（状态 + 最近活跃） |
+| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | 查看 hub 状态：邀请码生命周期（ROLE + 谁兑换的，`--reveal` 显码、`--token` 显示换出的令牌），或名册——producers 显示状态、ONLINE（实时隧道会话）与最近活跃；consumers 显示状态与最近活跃 |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
 | `aweshare hub usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，同一个人的行聚在一起，最忙在前——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印 · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
@@ -335,7 +335,7 @@ list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 | 命令 | 用途 |
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list --token` 找回） |
-| `aweshare consumer list --hub URL --token asc_… [--json]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
+| `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 

@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.4.9-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -308,7 +308,7 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
 | `aweshare hub produce [--host H] [--port N]` | run the hub with its own models attached — same as `serve`; the `[[backends]]`/`[[offerings]]` sections of `config.produce.toml` become `hub/…` offerings served in-process (keys in the data dir's secrets.json; edits hot-reload) |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `list --reveal`); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
-| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` the minted tokens), or the producer/consumer rosters with status and last seen |
+| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` the minted tokens), or the rosters — producers with status, ONLINE (live tunnel session) and last seen; consumers with status and last seen |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
 | `aweshare hub usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | who used how much (default): aggregate per consumer × model, a person's rows together, busiest first — requests, errors, rate, best-effort token totals, unknown-token count, mean duration; window defaults to 7d and is printed with the table · `--details`: per-request log, newest first, zero content stored, each row naming its consumer |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
@@ -336,7 +336,7 @@ Token issuance runs through invites (both roles). `limits` and `usage` are thin 
 | Command | Purpose |
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it; the operator can re-view it with `hub list --token`) |
-| `aweshare consumer list --hub URL --token asc_… [--json]` | discovery view of the hub: every producer, alias, protocol, status, the per-offering caps, live occupancy (`IN USE n/max` — distinct consumers with a request in flight right now; an alias at `max/max` admits no new consumer until one settles) and remaining daily tokens |
+| `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | discovery view of the hub: online offerings by default (degraded stay listed; `--all` includes offline) — every producer, alias, protocol, status, the per-offering caps, live occupancy (`IN USE n/max` — distinct consumers with a request in flight right now; an alias at `max/max` admits no new consumer until one settles) and remaining daily tokens |
 
 CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
 
