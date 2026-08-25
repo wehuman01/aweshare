@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-08-25
+
+### Added
+
+- **`aweshare hub produce init`** — bootstraps hub-hosted models in one command: it creates the editable `config.toml` template (every catalog entry commented out, so the file is valid to start before editing) and an empty owner-only `secrets.json`, never replacing either existing file, and along the way initializes the data dir, pepper, admin token and DB schema. It reports which files were created vs kept and prints the one-time admin token, ending with the next steps (`add [[backends]] / [[offerings]], fill secrets.json, then run: aweshare hub produce`). Previously operators assembled these files by hand before the first `produce` run.
+
+### Changed
+
+- **`aweshare hub usage` / `aweshare producer usage` now answer "who used how much" by default** — the aggregated summary replaces the per-request log as the default view, one row per consumer × model (`--group-by consumer-alias`, the default) so a person's rows stay together, busiest person and busiest model first; `--group-by consumer` rolls up to per-person totals, `--group-by alias` to per-model totals. The window defaults to 7 days (previously `--since` was required on summaries) and is printed with the table header; `--since all` covers everything. The old per-request view moves behind `--details` — its `--limit` flag follows it there — while `--consumer`/`--alias` filters work in both views. The bare `summary` positional is gone: passing it fails with a hint pointing at `--details`.
+
 ## [0.4.7] - 2026-08-25
 
 ### Added
