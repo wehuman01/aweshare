@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-26
+
+### Added
+
+- **Identity expiry: `--expires-in` bounds the minted identity, not just the code** — redeem copies the invite's expiry onto the identity it mints (schema v12; identities minted before the upgrade keep NULL and never expire). An expired key fails auth with 401 `TOKEN_EXPIRED`, an expired producer's tunnel is rejected at WS upgrade and closed on its next heartbeat, and `hub list` shows the redeemed invite as `expired`. `hub invite --expires-in none` mints a code and identity that never expire. Suspension still outranks expiry in the list, and `restore` never revives an expired identity — extend by minting a new invite. This changes the meaning of the CLI default: a plain `hub invite` now yields a 7-day trial end to end.
+
+- **`aweshare hub status` capacity view** — offerings are counted per deduplicated alias (one alias, several protocols → one verdict, the worst status) instead of per registration row, and a per-alias table lists protocols, live occupancy (`IN USE n/max`) and today's remaining daily tokens, worst status first. A `last 5m` line (requests, ok-rate, errors) aggregates the existing usage summary — hub-admission 429s are never metered, so it reflects relayed outcomes only. Occupancy columns show `-` against older hubs.
+
+- **Layered rate limiting on the invite-redeem entry** — every attempt now consumes a small per-origin-IP bucket (`AWESHARE_INVITE_REDEEM_PER_IP_MIN`, default 5, from `CF-Connecting-IP` behind a tunnel/proxy, hot-reloadable) so one hostile visitor can no longer monopolize admission for everyone; the existing `AWESHARE_INVITE_REDEEM_PER_MIN` becomes the global insurance budget, spent only by valid-format codes (distributed JSON garbage burns its own per-IP buckets and never the shared budget). The limiter's key map also sweeps abandoned origins past a sane bound.
+
+- **Unexpected hub errors no longer leak internals** — a request body that parses to `null`/an array/a scalar is a stable 400 `INVALID_JSON` instead of a 500 carrying `Cannot read properties of null …`, and any non-HttpError failure answers a generic `500 INTERNAL "internal error (details in the hub logs)"` with the real error kept to the structured server log.
+
+- **CLIs name Cloudflare edge blocks for what they are** — a 403 answered with an HTML page (a WAF rule in front of the hub, e.g. on `/admin` paths) now reports "blocked by a proxy/WAF in front of the hub" instead of a bare `403 Forbidden`, on both producer and consumer clients.
+
+- **Reconnect jitter** — the producer tunnel's exponential backoff now spreads each delay ±25%, so many agents reconnecting after a hub restart don't stampede it in lockstep.
+
 ## [0.5.0] - 2026-08-25
 
 ### Added
