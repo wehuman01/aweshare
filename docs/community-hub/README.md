@@ -14,6 +14,20 @@ Admission is invite-based for both roles — see [Contact](#contact) for how to 
 
 **For everyone:** the operator can suspend any identity by revoking its invite. A server run by someone you don't trust is not a place for sensitive traffic — in that case run your own hub: [`aweshare hub serve`](../../README.md#operations) on any box you control.
 
+## Compliance and disclaimer
+
+aweshare is relay software: it cannot and does not judge whether you are allowed to share a given upstream key or subscription — that question is between you and the upstream provider. Being able to call an API yourself does not mean you may re-provide it to third parties. The two kinds of backends sit in very different compliance positions:
+
+| Backend type | Compliance position |
+|---|---|
+| Self-hosted open models (Ollama / vLLM on your own GPU) | Clean — you share your own hardware and open weights; no upstream account is involved |
+| Third-party API accounts / personal subscription keys (coding plans included) | Read the upstream's terms first (account rules, subscription and seat limits, forwarding, commercial-use clauses); re-providing to third parties likely violates them. **When in doubt, don't share.** |
+
+The rest matches the main [README](https://github.com/wehuman01/aweshare/blob/main/README.md#compliance-and-disclaimer):
+
+- The consequences of sharing (key revocation, account suspension or termination by the upstream) fall on the producer; the hub operator is responsible for operating the hub lawfully and for informing consumers of the plaintext-transit boundary above.
+- The software is provided "as is" under the [proprietary license](https://github.com/wehuman01/aweshare/blob/main/LICENSE) (free to use and self-host, no redistribution), without warranty of any kind. The authors and contributors are not liable for how aweshare is used or for any damage arising from sharing access through it.
+
 ## What's shared right now
 
 Ask the hub, not this page — it changes:
@@ -146,7 +160,7 @@ Launch it with `aweswitch cc-aweshare`; Codex / OpenCode profiles and official-a
 
 ## Caps and fair use
 
-Per-offering guardrails are set by the producer (`maxConcurrencyPerUser` — concurrent requests per consumer, `maxConcurrentUsers` — distinct concurrent consumers, daily token budget and remaining — visible in `consumer list`). The hub also applies global admission limits (producers are capped, currently 10) and rate limiting. Hit a cap and the 429 error names it.
+Per-offering guardrails are set by the producer (`maxConcurrencyPerUser` — concurrent requests per consumer, `maxConcurrentUsers` — distinct concurrent consumers, daily token budget and remaining — visible in `consumer list`). The hub also applies global admission limits (consumers are capped, currently 10; producers are uncapped) and rate limiting. Hit a cap and the 429 error names it.
 
 ## FAQ
 

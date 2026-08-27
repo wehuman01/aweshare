@@ -14,6 +14,20 @@
 
 **对所有人：** 运维者可以随时吊销邀请码来停用任何身份。你不信任的人运营的服务器，不是放敏感流量的地方——这种情况请自建：在你控制的任意机器上跑 [`aweshare hub serve`](../../README_cn.md#运维)。
 
+## 合规与免责
+
+aweshare 是中继软件：它无法、也不判断你是否有权共享某个上游 key 或订阅——这是你与上游提供商之间的事。能自己调用 ≠ 有权转授第三方。两类后端的合规处境完全不同：
+
+| 后端类型 | 合规处境 |
+|---|---|
+| 自建开源模型（Ollama / vLLM 跑在自己的 GPU 上） | 干净——共享的是自己的硬件与开源权重，不涉及任何上游账号 |
+| 第三方 API 账号 / 个人订阅 key（含各类 coding plan） | 共享前先读上游条款（账号规则、订阅与席位限制、转发、商用约束）；转授第三方大概率违反这些条款。**拿不准就不要共享。** |
+
+其余条款与主 [README](https://github.com/wehuman01/aweshare/blob/main/README_cn.md#合规与免责) 一致：
+
+- 共享的后果（key 被吊销、账号被暂停或终止）由生产者自行承担；hub 运营者对自己的合法运营负责，并有义务让消费者知晓上面的明文中转边界。
+- 本软件依据[专有许可](https://github.com/wehuman01/aweshare/blob/main/LICENSE)（可自由使用与自托管，禁止再分发）"按原样"提供，不附带任何保证。作者与贡献者不为 aweshare 的使用方式、以及通过它共享访问所导致的任何损失承担责任。
+
 ## 现在共享了什么
 
 别问本页，问 hub——列表会变：
@@ -146,7 +160,7 @@ curl https://aweshare.wehuman.top/v1/chat/completions \
 
 ## 配额与公平使用
 
-单模型的护栏由生产者设定（`maxConcurrencyPerUser`——每个消费者的并发请求数、`maxConcurrentUsers`——并发消费者数、每日 token 预算及剩余——`consumer list` 里可见）。hub 另有全局准入上限（生产者名额当前 10 个）和限流。触顶时 429 报错会写明原因。
+单模型的护栏由生产者设定（`maxConcurrencyPerUser`——每个消费者的并发请求数、`maxConcurrentUsers`——并发消费者数、每日 token 预算及剩余——`consumer list` 里可见）。hub 另有全局准入上限（消费者名额当前 10 个，生产者不设限）和限流。触顶时 429 报错会写明原因。
 
 ## 常见问题
 

@@ -1,10 +1,10 @@
-# aweshare Community Hub Opens for Beta: 10 Spots, First Come First Served
+# aweshare Community Hub Opens for Beta: 10 Consumer Spots, Unlimited Producers
 
 ![aweshare](../../logo/logo.png)
 
 aweshare works by putting your idle AI capacity behind a standard facade: you run a lightweight producer on your own machine, where the upstream keys stay in `secrets.json` and never leave; friends point ordinary OpenAI / Anthropic SDKs at a hub, whose requests travel back to your machine over an outbound WebSocket — keys are injected only at call time. The whole stack is self-hostable — `aweshare hub serve` is one command away. Its only real threshold is that relay server: it needs a public IP, TLS, and someone watching the process. That's the one link the community hub replaces: **that machine already exists.**
 
-Starting today, the community hub at `https://aweshare.wehuman.top` is taking its first batch of testers: **10 spots, first come first served.**
+Starting today, the community hub at `https://aweshare.wehuman.top` is taking its first batch of testers: **10 consumer spots, first come first served — and no cap on producers, welcome anytime.**
 
 To be clear about what this does and doesn't replace: the hub takes over the "relay" link only. Keys and models still leave from your machine — for others to use your models, your machine must stay online with the producer running. That's aweshare by design: keys don't travel.
 
@@ -15,7 +15,7 @@ Just send an email:
 - **To**: [peng@wehuman.top](mailto:peng@wehuman.top)
 - **Include**: who you are; which role you want (producer / consumer); what you plan to share — Ollama / vLLM on an idle GPU, or an OpenAI Chat / OpenAI Responses / Anthropic-compatible API account (base URL + API key counts) — or which kinds of models you'd like to call.
 
-I'll reply with a one-time invite code (`asi_...`). The 10 spots go fast — later emails automatically join the waitlist for the next round.
+I'll reply with a one-time invite code (`asi_...`). Consumer spots go fast — later emails automatically join the waitlist for the next round; producer spots are uncapped.
 
 ## Once You Have an Invite
 
@@ -69,9 +69,18 @@ The hub relays traffic but never touches your keys — that's an architectural g
 
 One alias speaks one protocol, and the hub does no translation: callers pick the endpoint matching the alias's protocol, and a wrong endpoint gets a clear error pointing the way — never silently garbled output.
 
+## Compliance and Disclaimer
+
+Some things belong in a terms section, not just a one-line FAQ note:
+
+- aweshare is relay software: it cannot and does not judge whether you are allowed to share a given upstream key or subscription — that question is between you and the upstream provider. Being able to call an API yourself does not mean you may re-provide it to third parties.
+- The two kinds of backends therefore sit in very different positions: **self-hosted open models** (Ollama / vLLM on your own GPU) share your own hardware and open weights — no upstream account involved, clean; **third-party API accounts and personal subscription keys** (coding plans included) — read the upstream's terms first (account rules, subscription and seat limits, forwarding, commercial-use clauses); re-providing to third parties likely violates them. When in doubt, don't share.
+- The consequences of sharing (key revocation, account suspension or termination by the upstream) fall on the producer; the hub operator (me) is responsible for operating the hub lawfully and for informing every consumer of the "traffic transits the hub in plaintext" boundary.
+- The software is provided "as is" under the [proprietary license](https://github.com/wehuman01/aweshare/blob/main/LICENSE) (free to use and self-host, no redistribution), without warranty of any kind; the authors and contributors are not liable for how aweshare is used or for any damage arising from sharing access through it.
+
 ## You Might Be Wondering
 
-**Why 10?** The hub enforces a global admission cap on producers — currently 10 — so the first batch matches it. Consumers apply through the same email; I'll send codes after a quick confirmation.
+**Why 10?** The hub's global admission cap currently applies to consumers — 10 of them; producers are uncapped. If you want to consume, come early; if you want to produce, come anytime.
 
 **Is there an availability guarantee?** No — the hub is run by me personally. If it ever shuts down, producers lose only the connection itself (config and keys were always local); consumers find another hub or self-host one. If that day comes, I'll announce it.
 
@@ -83,9 +92,17 @@ One alias speaks one protocol, and the hub does no translation: callers pick the
 
 **Rate limited.** Per-model guardrails (`maxConcurrencyPerUser`, `maxConcurrentUsers`, daily token budget) are set by each publisher and visible in `consumer list`; the hub adds its own rate limits. When you hit them, the 429 explains why.
 
+## Build It Together
+
+This hub isn't meant to stay just a relay server. I'm inviting users with ideas to co-create something more useful:
+
+- **Share your idle compute.** The GPU in the corner, the subscription you can't max out — hook it up and it becomes an offering on the hub. Producer spots are uncapped; idle capacity is always welcome.
+- **Sustainability is being explored.** Down the road: ad revenue, or rewarding producers with credits the way compute-sharing communities (like 科研通) do — the compute you contribute earns points, and points may become redeemable down the line. All still ideas — come help define them.
+- **Bring your ideas.** Which models are missing, how to set caps fairly, what a credit should be worth — email [peng@wehuman.top](mailto:peng@wehuman.top) or open a [GitHub issue](https://github.com/wehuman01/aweshare/issues).
+
 ## Apply Now
 
-10 spots, first come first served.
+10 consumer spots, first come first served; producers uncapped, welcome anytime.
 
 Email [peng@wehuman.top](mailto:peng@wehuman.top) — who you are, whether you want to share or consume, and what backend you'll bring. Bugs in aweshare itself go to [GitHub issues](https://github.com/wehuman01/aweshare/issues).
 
@@ -95,7 +112,7 @@ aweshare is part of the aweteam ecosystem:
 
 - **[aweskill](https://aweskill.webioinfo.top/)** — CLI-first skill package manager supporting 47+ AI coding agents
 - **[aweswitch](https://github.com/Webioinfo01/aweswitch)** — agent config switcher for Claude Code, Codex, and OpenCode
-- **[awerouter](https://github.com/mugpeng/awerouter)** — smart router that sends requests to Flash or Pro models using structural signals
-- **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — AI coding session manager; restore sessions per profile
-- **[aweshare](https://github.com/wehuman01/aweshare)** — local-first AI capability relay: share your GPUs and API keys without keys ever leaving home
-- **[awewarm](https://github.com/mugpeng/awewarm)** — subscription window warmer keeping AI coding plans predictably open
+- **[awerouter](https://github.com/mugpeng/awerouter)** — smart router that uses structural signals to route requests to Flash or Pro models, reducing unnecessary model costs
+- **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — save, organize, and restore AI coding sessions; pair it with aweswitch to save configurations and launch with one click
+- **[aweshare](https://github.com/wehuman01/aweshare)** — share local Ollama/vLLM or authorized OpenAI/Anthropic backends through a self-hosted Hub, enabling a shared token economy
+- **[awewarm](https://github.com/mugpeng/awewarm)** — subscription-window keeper that keeps AI coding-plan windows active, whether configured locally or through a remotely connected server

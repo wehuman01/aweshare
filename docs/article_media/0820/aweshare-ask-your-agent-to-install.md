@@ -124,6 +124,15 @@ The architecture is three roles with a single tunnel between them:
 
 The trust boundary is explicit: consumer prompts and model responses pass through the hub in plaintext. The hub stores no content, but the hub operator can technically see it. This is why the hub is open source and self-hostable. Run your own hub. Trust your own hub. The upstream keys, meanwhile, never leave the producer's device — they are injected by the local agent and only the local agent.
 
+## Compliance and Disclaimer
+
+Some things belong in a terms section, not just a one-line note in an article:
+
+- aweshare is relay software: it cannot and does not judge whether you are allowed to share a given upstream key or subscription — that question is between you and the upstream provider. Being able to call an API yourself does not mean you may re-provide it to third parties.
+- The two kinds of backends sit in very different positions: **self-hosted open models** (Ollama / vLLM on your own GPU) share your own hardware and open weights — no upstream account involved, clean; **third-party API accounts and personal subscription keys** (coding plans included) — read the upstream's terms first (account rules, subscription and seat limits, forwarding, commercial-use clauses); re-providing to third parties likely violates them. When in doubt, don't share.
+- The consequences of sharing (key revocation, account suspension or termination by the upstream) fall on the producer; the hub operator is responsible for operating the hub lawfully and for informing every consumer of the "traffic transits the hub in plaintext" boundary.
+- The software is provided "as is" under the [proprietary license](https://github.com/wehuman01/aweshare/blob/main/LICENSE) (free to use and self-host, no redistribution), without warranty of any kind; the authors and contributors are not liable for how aweshare is used or for any damage arising from sharing access through it.
+
 ## Claude Code, Codex, OpenCode, and the Long Tail
 
 The same consumer setup works across clients.
