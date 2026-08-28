@@ -217,4 +217,4 @@ aweshare is part of the aweteam ecosystem:
 - **[awerouter](https://github.com/mugpeng/awerouter)** — A smart LLM router that automatically directs agent requests to fast, low-cost Flash models or more capable Pro providers using structural signals
 - **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — AI coding session manager with profile-aware restoration
 - **[aweshare](https://github.com/wehuman01/aweshare)** — An open-source, local-first AI capability relay: share token-denominated model capability — local models on an idle GPU, or your own subscriptions — without ever exposing the keys
-- **[awewarm](https://github.com/mugpeng/awewarm)** — Subscription window warmer that keeps AI coding-plan windows predictably open; pairs well with a shared coding-plan endpoint
+- **[awewarm](https://github.com/wehuman01/awewarm)** — Subscription window warmer that keeps AI coding-plan windows predictably open; pairs well with a shared coding-plan endpoint

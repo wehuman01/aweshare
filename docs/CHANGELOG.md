@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-08-28
+
+### Added
+
+- **Codex account-login sharing: `login = "codex"`** — a backend can authenticate with the producer machine's own `codex login` instead of a key, sharing a chatgpt subscription through the fixed official upstream `https://chatgpt.com/backend-api/codex` (responses wire; any other protocol or baseUrl is rejected at catalog load, and `producer doctor` skips its `/v1` suffix check for that URL, so account credentials can only ever reach the official upstream). The login is read from `${CODEX_HOME|~/.codex}/auth.json`, lives in producer memory only, and is re-read whenever the file changes or a request comes back 401 — a fresh `codex login` on the producer machine is picked up without a restart; no `secrets.json` entry exists for it. The producer injects the headers the Codex CLI itself sends, forces `store: false` on every request (the chatgpt backend requires it; consumer tools don't always send it), and sends login-safe probe payloads so health checks don't 400/403 against the account backend. The hub never sees the credential.
+
+- **`protocolLabel` in the consumer catalog API and CLI tables** — `openai` and `responses` offerings now carry a display label (`openai-chat` vs `openai-responses`) in the hub's consumer-facing JSON and render with it in `consumer list`, `producer list` and `hub status`, so a consumer can tell which of their tools will work: chat-completions clients vs Codex-CLI-style responses clients. Both wire protocols dial the hub with the same OpenAI SDK env vars; the label names the endpoint family they answer on.
+
+### Changed
+
+- **Hub CLI: `hub list` is gone** (breaking) — the read views it carried moved to where they belong: `hub status` is now the full live state — capacity, producer and consumer rosters, offering health — with roster columns matching `consumer list` / `producer list`, and the invite ledger lives on `hub invite --list` (`--reveal`/`--token` apply there; mint output now points at the new recovery command). Suspend/restore/limits keep their `--id` workflow, with ids now found via `hub invite --list`.
+
+- **The hub strips edge/CDN headers before relaying upstream** — `cf-*`, `x-forwarded-*`, `cdn-loop`, `true-client-ip`, `x-real-ip` and similar ingress headers are dropped, so upstreams see the request as coming from the producer instead of learning the hub's ingress path.
+
+### Fixed
+
+- **Usage metering missed bare-SSE upstreams** — the chatgpt codex backend streams `text/event-stream` payloads without the SSE content-type; the extractor assumed one JSON body and token counts came back empty. When the content-type is missing, the first bytes are now sniffed (`event:`/`data:` prefixes vs a JSON body) before deciding how to parse.
+
 ## [0.5.1] - 2026-08-26
 
 ### Added

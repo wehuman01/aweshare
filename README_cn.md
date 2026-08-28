@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.1-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.5-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -55,13 +55,14 @@
 ## 信任边界（先读这个）
 
 - 为完成路由与计量，**消费者的提示词与模型响应都会经过 Hub，不是端到端加密**。Hub 不持久化任何请求/响应内容，但 Hub 运维者技术上可见明文——请只使用你信得过的 Hub 实例（这也是 Hub 开源 + 自建部署的意义）。
-- 上游 API Key 永不离开生产者设备，也不会发给消费者。令牌在库内**有意存两份**：加盐 SHA-256 哈希用于认证，明文同时保留，运维者可用 `hub list --token` 把弄丢的令牌交还本人。邀请码同理——明文可通过 `hub list --reveal` 找回。数据库泄露会暴露全部身份，请妥善保管数据目录。
+- 上游 API Key 永不离开生产者设备，也不会发给消费者。令牌在库内**有意存两份**：加盐 SHA-256 哈希用于认证，明文同时保留，运维者可用 `hub invite --list --token` 把弄丢的令牌交还本人。邀请码同理——明文可通过 `hub invite --list --reveal` 找回。数据库泄露会暴露全部身份，请妥善保管数据目录。
 - 令牌吊销是**可逆挂起**（`hub revoke --id N` / `hub restore --id N`，按邀请码操作），且邀请码与它换出的生产者同进退：撤销已兑换的码即挂起对应生产者（并断开其隧道），从任一侧 restore 都同时救回两者。吊销不删除任何数据——offerings 与用量记录在挂起期间完整保留。
 
 ### 合规与免责
 
 - aweshare 是中继软件：它无法、也不判断你是否有权共享某个上游 key 或订阅——这是你与上游提供商之间的事。能自己调用 ≠ 有权转授第三方。
 - 共享前请阅读上游条款（账号规则、订阅与席位限制、转发、商用约束）。把个人订阅 key——包括各类 coding plan——共享给第三方，大概率违反这些条款；自部署开源模型无此问题。**拿不准就不要共享。**
+- 共享 CLI 登录（`login = "codex"`）风险更高：凭据是账户级的——它解锁该登录下的**所有**订阅，而不是一把限定范围的 key——转授第三方导致账号被封的可能性和影响面都大于共享 API key。`aweshare producer doctor` 会重复这条警示；决定权与后果都在生产者。
 - 共享的后果（key 被吊销、账号被暂停或终止）由生产者自行承担；hub 运营者对自己的合法运营负责，并有义务让消费者知晓上面的明文中转边界。
 - 本软件依据[专有许可](./LICENSE)（可自由使用与自托管，禁止再分发）"按原样"提供，不附带任何保证。作者与贡献者不为 aweshare 的使用方式、以及通过它共享访问所导致的任何损失承担责任。
 
@@ -135,7 +136,7 @@ aweshare consumer join --hub https://hub.example.com --code asi_...
 
 | 角色 | 谁持有 | 怎么用 |
 |---|---|---|
-| `admin` | Hub 操作者（只有你） | admin REST API（`/admin/v1/*`）；CLI 侧：`hub invite` / `list [invites\|producers\|consumers]` / `revoke` / `restore` |
+| `admin` | Hub 操作者（只有你） | admin REST API（`/admin/v1/*`）；CLI 侧：`hub invite`（铸造；`--list` 看台账）/ `status` / `revoke` / `restore` |
 | `producer`（`asp_...`） | 生产者机器上的 agent | 写进 `~/.aweshare/config.toml` 的 `token` 字段，agent 靠它向 hub 注册 offering |
 | `consumer`（`asc_...`） | 调用模型的一方 | 填在 SDK 环境变量（`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`）里，hub 靠它识别消费者并做计量、限额与挂起 |
 
@@ -232,6 +233,12 @@ protocol = "responses"                   # responses 型 baseUrl 含版本路径
 baseUrl = "https://open.bigmodel.cn/api/v1"
 keyRef = "glm-key"                       # 例如 GLM coding plan 的 key（Codex 就绪）
 
+[[backends]]
+id = "codex-account"
+protocol = "responses"
+baseUrl = "https://chatgpt.com/backend-api/codex"
+login = "codex"                          # 用本机 CLI 登录代替 key；与 keyRef 互斥
+
 [[offerings]]
 alias = "peng/qwen2.5.7b"                # 命名空间必须是你的生产者 name
 backend = "ollama"
@@ -256,6 +263,14 @@ maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并�
 `maxConcurrencyPerUser` 限的是每个消费者的并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——某消费者要并发发 5 个请求需要自己的 `maxConcurrencyPerUser ≥ 5`；该别名的总并发理论上限是 `maxConcurrentUsers × maxConcurrencyPerUser`。日额度统计已记录用量（见下文「诚实的限制」）。（v0.4.3 由 `maxConcurrency` 改名而来，旧键限的是别名总并发。）
 
 密钥卫生：用专用最小权限、可撤销、带预算告警的 key；`secrets.json` 保持 0600、不进 git/截图；疑似泄露立即轮换。共享权利自查：账号条款、订阅限制、转发与商用约束。
+
+**账号登录型 backend**（`login = "codex"`）不用 key，而是用生产者本机的 `codex login` 做认证——固定官方上游为 `https://chatgpt.com/backend-api/codex`，使用 responses 线协议；其他协议或 base URL 会被拒绝，避免账户凭据被发往别处。行为要点：
+
+- 登录凭据读自 `${CODEX_HOME|~/.codex}/auth.json`，只存在于生产者进程内存；文件变化或请求返回 401 时自动重读——生产者重新 `codex login` 后无需重启。secrets.json 里没有它的条目。
+- 生产者注入 Codex CLI 自己携带的原生请求头，并强制每个请求 `store: false`（chatgpt 后端要求；消费端工具不一定带）。
+- 消费端只支持 `/v1/responses`：Codex CLI（默认 `wire_api`）、opencode（`@ai-sdk/openai`）、Cline（OpenAI Native）。chat-completions 工具和 Claude Code 用不了这类 offering。
+- aweshare 从不刷新 token：登录过期后该 offering 降级（连续 2 次 401 → 503 `BACKEND_DEGRADED`），生产者重新 `codex login` 后由 30s 探活自动恢复（探活会重读文件）。
+- 共享订阅登录比共享 API key **风险更高**——见上方合规段：凭据是账户级的，解锁该登录下的全部订阅；封号后果由生产者自行承担。
 
 ## 消费者限制（全局默认 + 按消费者覆盖）
 
@@ -306,16 +321,16 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub |
 | `aweshare hub produce [--host H] [--port N]` | 启动 hub 并挂上自有模型——与 `serve` 同一进程；`config.produce.toml` 的 `[[backends]]`/`[[offerings]]` 段注册为 `hub/…` offering，由 hub 进程直接服务（key 在数据目录的 secrets.json；改动热加载） |
-| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `list --reveal` 重新查看）；`--expires-in` 同时限定其铸造令牌的寿命——到期后认证返回 401 `TOKEN_EXPIRED`、在线隧道在下一个心跳被关闭（`none` 表示码与身份都永不过期；此变更之前铸造的身份永不过期）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
-| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | 查看 hub 状态：邀请码生命周期（ROLE + 谁兑换的，`--reveal` 显码、`--token` 显示换出的令牌；已兑换的码在身份过期后显示 `expired`），或名册——producers 显示状态、ONLINE（实时隧道会话）与最近活跃；consumers 显示状态与最近活跃 |
-| `aweshare hub status` | 运维总览：producer 席位、consumer 身份、按去重 alias 计数的模型健康（一个别名多协议只算一个、取最差状态）、per-alias 表（实时占用 `IN USE n/max`、当日剩余 token，问题状态在前），以及来自用量汇总的最近 5 分钟请求/成功率/错误行（hub 准入类 429 不计量） |
+| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `invite --list --reveal` 重新查看）；`--expires-in` 同时限定其铸造令牌的寿命——到期后认证返回 401 `TOKEN_EXPIRED`、在线隧道在下一个心跳被关闭（`none` 表示码与身份都永不过期；此变更之前铸造的身份永不过期）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
+| `aweshare hub invite --list [--reveal] [--token] [--json]` | 邀请码台账：每个码、它换出的身份与生命周期（pending/used/suspended/revoked/expired；已兑换的码在身份过期后显示 `expired`）；`--reveal` 显码，`--token` 连同铸造令牌与最近活跃一起显示 |
+| `aweshare hub status` | hub 实时状态：producer 席位、producer 与 consumer 名册（状态、ONLINE 实时隧道、最近活跃）、按去重 alias 计数的模型健康（一个别名多协议只算一个、取最差状态）、per-alias 表——列与 `consumer list`/`producer list` 完全一致、问题状态在前——含实时占用（`IN USE n/max`）与当日剩余 token，以及来自用量汇总的最近 5 分钟请求/成功率/错误行（hub 准入类 429 不计量） |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
 | `aweshare hub usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，同一个人的行聚在一起，最忙在前——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印 · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
 
 令牌签发统一走邀请码（两种角色）。`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。
 
-list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
+`invite --list`、`status` 与各用量视图默认输出对齐表格；（如文档所列）加 `--json` 可获取原始 API 响应。
 
 **生产者侧**——运行在生产者（即带后端）的那台机器上：
 
@@ -335,7 +350,7 @@ list 默认输出对齐表格；加 `--json` 可获取原始 API 响应。
 
 | 命令 | 用途 |
 |---|---|
-| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list --token` 找回） |
+| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub invite --list --token` 找回） |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
@@ -348,7 +363,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 
 **热加载**：除 host/port 外，表中所有可调参数都支持运行中 `SIGHUP` 生效（`kill -HUP <pid>`；Docker 用 `docker kill -s HUP aweshare-hub`）——先校验新文件，写坏了只记日志、继续用旧值服务。环境变量在进程启动时就固定了，被 `AWESHARE_*` 钉住的键不受重载影响（与启动时同一优先级）；host/port 仍需重启。生产者侧的 offerings 与限额用 `aweshare producer reload` 热加载。
 
-**hub 自挂模型（`hub produce`）**：`config.produce.toml` 放 `[[backends]]` 和 `[[offerings]]` 段（producer 格式；别名命名空间 `hub/…`，裸名自动补前缀），上游 key 放同目录的 `secrets.json`（chmod 600）；`config.toml` 仅保留 Hub 自身运行参数。这些 offering 在目录里挂在 producer `hub` 名下，由 hub 进程直接转发——不走隧道，也不占 `AWESHARE_MAX_PRODUCERS` 席位。限额（`maxConcurrencyPerUser`、`maxConcurrentUsers`、`dailyTokens`）、用量计量和 consumer 限额与远端 producer 完全一致。内置 producer `hub` 不是身份（无令牌、无邀请码、不可撤销）；只有在它名下确实挂着 offering 时才出现在 `hub list producers` 里，状态显示为 `built-in`。目录与 key 改动像其他参数一样热加载；写坏了保留旧目录并记日志。
+**hub 自挂模型（`hub produce`）**：`config.produce.toml` 放 `[[backends]]` 和 `[[offerings]]` 段（producer 格式；别名命名空间 `hub/…`，裸名自动补前缀），上游 key 放同目录的 `secrets.json`（chmod 600）；`config.toml` 仅保留 Hub 自身运行参数。这些 offering 在目录里挂在 producer `hub` 名下，由 hub 进程直接转发——不走隧道，也不占 `AWESHARE_MAX_PRODUCERS` 席位。限额（`maxConcurrencyPerUser`、`maxConcurrentUsers`、`dailyTokens`）、用量计量和 consumer 限额与远端 producer 完全一致。内置 producer `hub` 不是身份（无令牌、无邀请码、不可撤销）；只有在它名下确实挂着 offering 时才出现在 `hub status` 的 producers 名册里，状态显示为 `built-in`。目录与 key 改动像其他参数一样热加载；写坏了保留旧目录并记日志。
 
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
@@ -371,6 +386,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 ## 已知限制（v1）
 
 - 不做跨协议转换：一个别名只讲一种线协议（openai chat、anthropic messages 或 openai responses）。
+- 账号登录型 backend 不刷新 token：codex 登录过期后该 offering 保持降级，直到有人在生产者本机重新 `codex login`（文件变化后自动恢复）。
 - Ollama 流式响应不带 usage → token 数记 NULL（尽力而为）。
 - 单 Hub 单实例 + SQLite，无水平扩展。
 - 企业代理可能拦截 WebSocket 隧道（环境限制）。

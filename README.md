@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.1-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.5-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -55,13 +55,14 @@ Consumer (standard SDK, zero changes)         Producer side
 ## Trust boundary (read this first)
 
 - To route and meter, **consumer prompts and model responses transit the hub in plaintext — this is not end-to-end encryption**. The hub persists no request/response content, but the hub operator can technically see it. Only use a hub instance you trust — which is why the hub is open source and self-hostable.
-- Upstream API keys never leave the producer's device and are never sent to consumers. Tokens are stored twice on purpose: a **peppered SHA-256 hash** drives authentication, and the plaintext is kept so the operator can hand a lost one back (`hub list --token`). Invite codes work the same way — their plaintext is re-viewable with `hub list --reveal`. A DB leak therefore exposes every identity, so guard the data dir.
+- Upstream API keys never leave the producer's device and are never sent to consumers. Tokens are stored twice on purpose: a **peppered SHA-256 hash** drives authentication, and the plaintext is kept so the operator can hand a lost one back (`hub invite --list --token`). Invite codes work the same way — their plaintext is re-viewable with `hub invite --list --reveal`. A DB leak therefore exposes every identity, so guard the data dir.
 - Token revocation is **reversible suspension** (`hub revoke --id N` / `hub restore --id N`, by invite), and an invite and the producer it minted move together: revoking a redeemed code suspends that producer (and closes its tunnel), and restoring from either handle revives both. Nothing is deleted on revoke — offerings and usage history survive a suspension.
 
 ### Compliance and disclaimer
 
 - aweshare is relay software: it cannot and does not judge whether you are allowed to share a given upstream key or subscription — that question is between you and the upstream provider. Being able to call an API yourself does not mean you may resell or re-provide it to third parties.
 - Before sharing anything, read the upstream's terms (account rules, subscription and seat limits, forwarding, commercial-use clauses). Sharing a personal-subscription key — coding plans included — with third parties likely violates those terms; self-hosted open models have no such issue. **When in doubt, don't share.**
+- Sharing a CLI login (`login = "codex"`) raises the stakes further: the credential is account-wide — it unlocks every subscription under that login, not one scoped key — so relaying it to third parties carries a higher risk of account suspension or termination than sharing an API key. `aweshare producer doctor` repeats this warning; the decision and its consequences sit with the producer.
 - The producer bears the consequences of sharing (key revocation, account suspension or termination by the upstream). The hub operator is responsible for operating the hub lawfully and for informing consumers of the plaintext-transit boundary above.
 - The software is provided "as is" under the [proprietary license](./LICENSE) — free to use and self-host, no redistribution — without warranty of any kind. The authors and contributors are not liable for how aweshare is used or for any damage arising from sharing access through it.
 
@@ -136,7 +137,7 @@ Three token roles, one per party:
 
 | Role | Who holds it | How it's used |
 |---|---|---|
-| `admin` | hub operator (you only) | the admin REST API (`/admin/v1/*`); CLI side: `hub invite` / `list [invites\|producers\|consumers]` / `revoke` / `restore` |
+| `admin` | hub operator (you only) | the admin REST API (`/admin/v1/*`); CLI side: `hub invite` (mint; `--list` for the ledger) / `status` / `revoke` / `restore` |
 | `producer` (`asp_...`) | the agent on the producer's machine | set as `token` in `~/.aweshare/config.toml`; the agent registers its offerings with it |
 | `consumer` (`asc_...`) | whoever calls the models | set in SDK env vars (`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`); it identifies the consumer for metering, limits and suspension |
 
@@ -233,6 +234,12 @@ protocol = "responses"                   # responses-style baseUrl includes the 
 baseUrl = "https://open.bigmodel.cn/api/v1"
 keyRef = "glm-key"                       # e.g. a GLM coding-plan key (Codex-ready)
 
+[[backends]]
+id = "codex-account"
+protocol = "responses"
+baseUrl = "https://chatgpt.com/backend-api/codex"
+login = "codex"                          # account auth instead of a key; exclusive with keyRef
+
 [[offerings]]
 alias = "peng/qwen2.5.7b"                # namespace must be your producer name
 backend = "ollama"
@@ -257,6 +264,14 @@ One alias can also speak several wire protocols at once: replace `backend = "…
 `maxConcurrencyPerUser` caps each consumer's in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a consumer firing 5 parallel requests needs `maxConcurrencyPerUser ≥ 5` for itself alone, while the total on the alias is bounded by `maxConcurrentUsers × maxConcurrencyPerUser`. Daily caps count recorded usage (see "Honest limits" below). (Renamed in v0.4.3 from `maxConcurrency`, which capped the alias's total in-flight requests.)
 
 Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; keep `secrets.json` at 0600 and out of git/screenshots; rotate on suspected leaks. Before sharing, check the upstream's terms: account rules, subscription limits, forwarding and commercial-use constraints.
+
+**Account-login backends** (`login = "codex"`) authenticate with the producer machine's own `codex login` instead of a key — the fixed official upstream is `https://chatgpt.com/backend-api/codex`, responses wire. Other protocols or base URLs are rejected so the account credential cannot be sent elsewhere. How it behaves:
+
+- The login is read from `${CODEX_HOME|~/.codex}/auth.json`, stays in producer memory only, and is re-read whenever the file changes or a request comes back 401 — so a fresh `codex login` on the producer machine is picked up without a restart. No secrets.json entry exists for it.
+- The producer injects the headers the Codex CLI itself sends and forces `store: false` on every request (the chatgpt backend requires it; consumer tools don't always send it).
+- Consumers must speak `/v1/responses`: Codex CLI (default `wire_api`), opencode (via `@ai-sdk/openai`), Cline (OpenAI Native provider). Chat-completions tools and Claude Code cannot use these offerings.
+- Tokens are never refreshed by aweshare: when the login expires the offering degrades (2 consecutive 401s → 503 `BACKEND_DEGRADED`) and recovers on its own once you re-run `codex login` — the 30s recovery probe re-reads the file.
+- Sharing a subscription login is **higher-risk than sharing an API key** — see the compliance section above: the credential is account-wide, and the producer bears suspension of the whole account.
 
 ## Consumer limits (hub-wide defaults + per-consumer overrides)
 
@@ -307,16 +322,16 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub init` | create data dir + admin token (printed once) |
 | `aweshare hub serve [--host H] [--port N]` | run the hub |
 | `aweshare hub produce [--host H] [--port N]` | run the hub with its own models attached — same as `serve`; the `[[backends]]`/`[[offerings]]` sections of `config.produce.toml` become `hub/…` offerings served in-process (keys in the data dir's secrets.json; edits hot-reload) |
-| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `list --reveal`); `--expires-in` also bounds the lifetime of the token it mints — an expired key fails auth with 401 `TOKEN_EXPIRED` (`none` = code and identity never expire; identities minted before this change never expire); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
-| `aweshare hub list [invites\|producers\|consumers] [--reveal] [--token] [--json]` | read hub state: invite lifecycle (ROLE + who redeemed, `--reveal` codes, `--token` the minted tokens; a redeemed code shows `expired` once its identity's expiry passes), or the rosters — producers with status, ONLINE (live tunnel session) and last seen; consumers with status and last seen |
-| `aweshare hub status` | operator overview: producer slots, consumer identities, offerings counted per deduplicated alias (several protocols → one verdict, the worst), a per-alias table with live occupancy (`IN USE n/max`) and today's remaining daily tokens (worst status first), and a last-5m requests/ok-rate/errors line from the usage summary (hub-admission 429s are not metered) |
+| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `invite --list --reveal`); `--expires-in` also bounds the lifetime of the token it mints — an expired key fails auth with 401 `TOKEN_EXPIRED` (`none` = code and identity never expire; identities minted before this change never expire); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
+| `aweshare hub invite --list [--reveal] [--token] [--json]` | the invite ledger: every code, the identity it minted and its lifecycle (pending/used/suspended/revoked/expired; a redeemed code shows `expired` once its identity's expiry passes); `--reveal` re-shows the codes, `--token` the minted tokens with last seen |
+| `aweshare hub status` | the hub's live state: producer slots, the producer and consumer rosters (status, ONLINE live-tunnel state, last seen), offerings counted per deduplicated alias (several protocols → one verdict, the worst), a per-alias table — the same columns as `consumer list` and `producer list`, worst status first — with live occupancy (`IN USE n/max`) and today's remaining daily tokens, and a last-5m requests/ok-rate/errors line from the usage summary (hub-admission 429s are not metered) |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
 | `aweshare hub usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | who used how much (default): aggregate per consumer × model, a person's rows together, busiest first — requests, errors, rate, best-effort token totals, unknown-token count, mean duration; window defaults to 7d and is printed with the table · `--details`: per-request log, newest first, zero content stored, each row naming its consumer |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
 
 Token issuance runs through invites (both roles). `limits` and `usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too.
 
-`list` prints an aligned table by default; append `--json` for the raw API response.
+`invite --list`, `status` and the usage views print aligned tables by default; append `--json` (where documented) for the raw API response.
 
 **Producer** — runs on the producer's machine (the one with the backends):
 
@@ -336,7 +351,7 @@ Token issuance runs through invites (both roles). `limits` and `usage` are thin 
 
 | Command | Purpose |
 |---|---|
-| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it; the operator can re-view it with `hub list --token`) |
+| `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it; the operator can re-view it with `hub invite --list --token`) |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | discovery view of the hub: online offerings by default (degraded stay listed; `--all` includes offline) — every producer, alias, protocol, status, the per-offering caps, live occupancy (`IN USE n/max` — distinct consumers with a request in flight right now; an alias at `max/max` admits no new consumer until one settles) and remaining daily tokens |
 
 CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
@@ -349,7 +364,7 @@ The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Do
 
 **Hot reload:** every tunable in the table except host/port applies live on `SIGHUP` (`kill -HUP <pid>`; Docker: `docker kill -s HUP aweshare-hub`) — the new file is validated first, and a broken edit is logged while the previous values keep serving. Env vars are fixed at process start, so keys pinned by `AWESHARE_*` ignore the reloaded file (same precedence as startup); host/port need a restart. Producer-side offerings and caps reload via `aweshare producer reload`.
 
-**Hub-hosted models (`hub produce`):** `config.produce.toml` carries `[[backends]]` and `[[offerings]]` sections (producer format; alias namespace `hub/…` — bare names are auto-prefixed) with upstream keys in `secrets.json` next to it (chmod 600). `config.toml` remains exclusively for Hub runtime settings. Those offerings appear in the catalog under producer `hub` and are served by the hub process directly — no tunnel, and they never count against `AWESHARE_MAX_PRODUCERS`. Caps (`maxConcurrencyPerUser`, `maxConcurrentUsers`, `dailyTokens`), usage metering and consumer limits apply exactly as for remote producers. The built-in `hub` producer is not an identity (no token, no invite, cannot be revoked); it appears in `hub list producers` — status `built-in` — only while it carries offerings. Catalog and key edits hot-reload like the tunables; a broken catalog keeps the previous one and is logged.
+**Hub-hosted models (`hub produce`):** `config.produce.toml` carries `[[backends]]` and `[[offerings]]` sections (producer format; alias namespace `hub/…` — bare names are auto-prefixed) with upstream keys in `secrets.json` next to it (chmod 600). `config.toml` remains exclusively for Hub runtime settings. Those offerings appear in the catalog under producer `hub` and are served by the hub process directly — no tunnel, and they never count against `AWESHARE_MAX_PRODUCERS`. Caps (`maxConcurrencyPerUser`, `maxConcurrentUsers`, `dailyTokens`), usage metering and consumer limits apply exactly as for remote producers. The built-in `hub` producer is not an identity (no token, no invite, cannot be revoked); it appears in the `hub status` producers roster — status `built-in` — only while it carries offerings. Catalog and key edits hot-reload like the tunables; a broken catalog keeps the previous one and is logged.
 
 | Env var | Default | Purpose |
 |---|---|---|
@@ -372,6 +387,7 @@ Updating a Docker deployment: `docker compose pull && docker compose up -d`. Sta
 ## Known limitations (v1)
 
 - No cross-protocol conversion: an alias speaks exactly one wire (openai chat, anthropic messages, or openai responses).
+- Account-login backends never refresh tokens: an expired codex login degrades the offering until someone runs `codex login` again on the producer machine (recovery is automatic once the file changes).
 - Ollama streams carry no usage → token counts recorded as NULL (best effort by design).
 - Single hub instance + SQLite; no horizontal scaling.
 - Corporate proxies may block the WebSocket tunnel (environmental limit).

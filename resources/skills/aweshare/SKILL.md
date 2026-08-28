@@ -15,7 +15,8 @@ You may run these read-only commands:
 - `aweshare producer config path`
 - `aweshare producer config show` (secrets redacted)
 - `aweshare producer doctor`
-- `aweshare hub list [invites|producers|consumers]` (invites: lifecycle pending/used/suspended/revoked/expired, `--reveal` re-shows stored codes, `--token` shows the token each invite minted; producers/consumers: rosters with status and last seen)
+- `aweshare hub invite --list [--reveal] [--token]` — the invite ledger: lifecycle pending/used/suspended/revoked/expired; `--reveal` re-shows stored codes, `--token` shows the token each invite minted
+- `aweshare hub status` — live state: capacity, producer/consumer rosters (status, ONLINE, last seen) and the offering table (same columns as `consumer list`, worst status first, live occupancy and today's remaining daily tokens)
 - `aweshare hub usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` — recent requests, newest first
 - `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
 
@@ -23,13 +24,13 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare producer init [--hub URL] [--token asp_...]` — write config template + empty secrets (no-op if they exist)
 - `aweshare producer config edit` — open config in `$VISUAL`/`$EDITOR`/`vi`
 - `aweshare hub init`
-- `aweshare hub invite [--role producer|consumer] [--name NAME] [--count N] [--expires-in D]` — mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `hub list --reveal`); consumers need `--role consumer --name NAME`
+- `aweshare hub invite [--role producer|consumer] [--name NAME] [--count N] [--expires-in D]` — mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `hub invite --list --reveal`); consumers need `--role consumer --name NAME`
 - `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]` — show (bare), merge or clear one consumer's limit overrides
 - `aweshare hub revoke --id N`, `aweshare hub restore --id N` — kill / revive an invite; a redeemed one carries its identity (producer or consumer) with it
 - `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
 - `aweshare producer reload` — re-read config.toml + secrets.json and re-register the offerings on the open tunnel (no disconnect; a broken config keeps the previous values — check `producer doctor --status` for the log). Since v0.4.2 both processes stat-poll their config every 2s and apply valid edits automatically — `reload`/SIGHUP just skips that delay; only `hubUrl`/`token` changes need a restart
 
-The operator owns admission and access: one-time invite codes for both roles (the only admission path; every identity carries its invite handle from mint to suspension). A redeemed consumer key may call **every** offering on the hub — there are no per-alias grants. Guardrails are all hub-side and CLI-managed: per-consumer `limits`, per-offering caps (`maxConcurrentUsers`/`dailyTokens` from the producer's config), and `revoke`/`restore` suspension. The hub CLI covers admission (`invite`), state (`list`), tuning (`limits`), metering (`usage`) and suspension (`revoke`/`restore`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too.
+The operator owns admission and access: one-time invite codes for both roles (the only admission path; every identity carries its invite handle from mint to suspension). A redeemed consumer key may call **every** offering on the hub — there are no per-alias grants. Guardrails are all hub-side and CLI-managed: per-consumer `limits`, per-offering caps (`maxConcurrentUsers`/`dailyTokens` from the producer's config), and `revoke`/`restore` suspension. The hub CLI covers admission (`invite`, `invite --list` for the ledger), state (`status`), tuning (`limits`), metering (`usage`) and suspension (`revoke`/`restore`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too.
 
 ## Suspension semantics (hub)
 
@@ -46,7 +47,7 @@ Revocation is **reversible suspension**, never deletion, and the invite is the o
 | "Show my config" | Config Show | `aweshare producer config show` |
 | "Something doesn't work" | Diagnose | `aweshare producer doctor` — fix the first FAIL |
 | "Suspend / bring back a user or token" | Hub admin | `aweshare hub revoke --id N` / `restore --id N` (by invite, reversible — see Suspension semantics) |
-| "Who can use what?" | Browse | Every admitted consumer can call every offering; list them with `aweshare hub list consumers` (admitted) and see what is shared via the consumer catalog (`aweshare consumer list`) |
+| "Who can use what?" | Browse | Every admitted consumer can call every offering; see who is admitted in the `aweshare hub status` rosters and what is shared via the consumer catalog (`aweshare consumer list`) |
 | "Set up a hub" | Hub setup | npm or Docker — see Hub Deployment; `init` prints the admin token once; user runs `serve`/container themselves |
 | "Issue a consumer token (asc_)" | Hub admin | `aweshare hub invite --role consumer --name NAME` (bound, single); the consumer redeems the code themselves with `aweshare consumer join` and keeps the printed `asc_` token — see Admission via Invite Codes |
 | "Rate-limit or cap a consumer" | Hub admin | `aweshare hub limits NAME --rps 5 --max-concurrent 2 --tpm 60000 --max-total-tokens 5000000` (merges; bare call views; `--clear` resets to hub-wide defaults; unset keys keep the `AWESHARE_CONSUMER_*` defaults) |
@@ -128,12 +129,12 @@ aweshare hub invite --role consumer --name alice [--expires-in 7d]
 aweshare producer join --hub https://<hub-host> --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
 
 # consumer side — prints the asc_ token once with ready-to-paste SDK env vars
-# (save it; the operator can re-view it with `hub list --token`); no aweshare? curl works too:
+# (save it; the operator can re-view it with `hub invite --list --token`); no aweshare? curl works too:
 aweshare consumer join --hub https://<hub-host> --code asi_...
 # curl -s -X POST https://<hub-host>/invites/v1/redeem -H 'content-type: application/json' -d '{"code":"asi_..."}'
 ```
 
-Codes are single-use, optionally expiring, and revocable at any stage (`hub list` shows pending/used/suspended/revoked/expired; `hub revoke --id N`, undo with `hub restore --id N`). Revoking a **redeemed** code suspends the identity it minted (a producer's token dies and tunnel closes; a consumer's key is suspended) — one code, one identity; restore revives both. Both `join` commands assert their role, so handing a code to the wrong one fails with `409 INVITE_ROLE_MISMATCH` without burning the code. `hub list --reveal` re-shows stored codes; `hub list --token` re-shows each minted token with when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full; consumers uncapped). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, start).
+Codes are single-use, optionally expiring, and revocable at any stage (`hub invite --list` shows pending/used/suspended/revoked/expired; `hub revoke --id N`, undo with `hub restore --id N`). Revoking a **redeemed** code suspends the identity it minted (a producer's token dies and tunnel closes; a consumer's key is suspended) — one code, one identity; restore revives both. Both `join` commands assert their role, so handing a code to the wrong one fails with `409 INVITE_ROLE_MISMATCH` without burning the code. `hub invite --list --reveal` re-shows stored codes; `hub invite --list --token` re-shows each minted token with when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full; consumers uncapped). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, start).
 
 ## Producer Config Structure (config.toml)
 

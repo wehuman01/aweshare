@@ -234,7 +234,7 @@ Remind the consumer: prompts and responses transit the hub in plaintext — only
    Consumers redeem codes themselves (`aweshare consumer join`); producers via `aweshare producer join`.
 3. Administering a remote hub: run admin commands on the server (`ssh` + CLI, or `docker exec aweshare-hub aweshare hub ...`), or locally with `AWESHARE_HUB_URL=https://<hub-host>` plus the admin-token file in a local data dir — otherwise they fail with "no admin token" / connection refused.
 4. Guardrails you can tune on request: per-consumer `aweshare hub limits NAME [--rps N] [--tpm N] [--max-total-tokens N] ...`, suspension `aweshare hub revoke --id N` / `restore --id N` (reversible, invite-keyed).
-5. Security notes for the operator: keep :8787 off the public internet behind TLS; a redeemed consumer key can call **every** offering on the hub; tokens/codes stored plaintext-recoverable (`hub list --reveal` / `--token`) means a data-dir leak exposes identities — guard it.
+5. Security notes for the operator: keep :8787 off the public internet behind TLS; a redeemed consumer key can call **every** offering on the hub; tokens/codes stored plaintext-recoverable (`hub invite --list --reveal` / `--token`) means a data-dir leak exposes identities — guard it.
 
 ---
 
@@ -245,7 +245,7 @@ After setup:
 ```bash
 aweshare producer doctor            # full diagnosis, ordered to find the first failing link
 aweshare producer list              # registered offerings, live status, caps, occupancy, config drift
-aweshare hub list producers         # roster + last seen (admin context only)
+aweshare hub status                 # rosters + offering health (admin context only)
 aweshare hub usage                  # who used how much, aggregated per consumer × model
 aweshare self-update --check        # installed vs npm latest
 ```
@@ -270,7 +270,8 @@ aweshare producer doctor [--status]  # diagnosis (with --status: instant, no net
 aweshare producer list [--json]      # this producer's offerings + drift
 aweshare producer usage [...]        # who used this producer's models
 aweshare consumer list --hub URL --token asc_...   # hub catalog view
-aweshare hub list [invites|producers|consumers] [--json]   # rosters / invite lifecycle
+aweshare hub status                          # capacity, rosters, offering health
+aweshare hub invite --list [--reveal|--token]        # invite ledger / codes / minted tokens
 aweshare hub limits NAME             # bare call views current overrides
 aweshare hub usage [--details] [--group-by consumer|alias] [--since 7d]
 aweshare self-update --check         # versions only

@@ -1,6 +1,6 @@
 # aweshare 社区 hub 开测：消费者 10 个名额，生产者不设限
 
-![aweshare](../../logo/logo.png)
+![aweshare](../../../logo/logo.png)
 
 aweshare 的思路，是把闲置的 AI 能力接到统一接口上：你在自己的机器上运行一个轻量 producer，上游 key 始终留在 `secrets.json`；朋友把普通的 OpenAI / Anthropic SDK 指向 hub，请求会通过出站 WebSocket 回到你的机器，调用时才注入 key。整套系统都可以自建——一条 `aweshare hub serve` 就能启动。真正的门槛只有中转服务器：需要公网 IP、TLS 配置，还要有人维护进程。社区版 hub 解决的正是这一环：服务器已经准备好了。
 
@@ -106,6 +106,14 @@ hub 中转流量但从不经手你的 key——这是架构保证，不是一句
 
 发邮件到 [peng@wehuman.top](mailto:peng@wehuman.top)，说明你是谁、想共享还是使用，以及准备接入什么后端。aweshare 本身的 bug 请提交至 [GitHub issues](https://github.com/wehuman01/aweshare/issues)。
 
+
+
+## aweshare 系列文章
+
+- [aweshare：迈入共享token 时代](https://mp.weixin.qq.com/s/zFRIuxdLj6F5vPj9P7rXAQ)
+
+
+
 ## More from mugpeng
 
 aweshare 是 aweteam 生态的一部分：
@@ -115,4 +123,4 @@ aweshare 是 aweteam 生态的一部分：
 - **[awerouter](https://github.com/mugpeng/awerouter)** — 智能路由器，用结构信号把请求分给 Flash 或 Pro 模型，减少不必要的模型开销
 - **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — 收藏、分类、恢复 AI 编程会话，还能搭配 aweswitch 实现保存配置，一键启动
 - **[aweshare](https://github.com/wehuman01/aweshare)** — 通过自建 Hub 共享本地 Ollama/vLLM 或已授权的 OpenAI/Anthropic 后端，实现 token 的共享经济
-- **[awewarm](https://github.com/mugpeng/awewarm)** — 订阅窗口保持器，让 AI 编程套餐的窗口持续激活，无论是本地设置，还是通过远程连接的服务器
+- **[awewarm](https://github.com/wehuman01/awewarm)** — 订阅窗口保持器，让 AI 编程套餐的窗口持续激活，无论是本地设置，还是通过远程连接的服务器
