@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-08-29
+
+### Added
+
+- **Adaptive backend recovery probes** — degraded backends now use a health ladder keyed to time spent degraded, with bounded probe caps that escalate as an outage continues instead of repeatedly probing at one fixed cadence.
+- **HTTP(S) proxy support for Codex account login** — account-login backends honor the standard proxy environment variables for the fixed ChatGPT upstream, while keeping proxy URLs out of logs and rejecting unsupported SOCKS proxies.
+
+### Changed
+
+- **More realistic hub-local health checks** — hub-hosted offerings probe with a real model request, so health status reflects the configured upstream path instead of relying on a synthetic request that some backends reject.
+
+### Fixed
+
+- **Codex Responses compatibility** — account-login forwarding removes `max_output_tokens` when present, avoiding a request rejection from the ChatGPT Codex backend.
+
 ## [0.5.5] - 2026-08-28
 
 ### Added
