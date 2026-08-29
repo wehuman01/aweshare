@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.6-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.7-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -185,6 +185,16 @@ curl https://hub.example.com/v1/chat/completions \
 
 ## Consumer tool configuration
 
+**Match the protocol to the tool first** — an alias speaks exactly one wire protocol and the hub never translates. Base URLs come in exactly two shapes: both OpenAI wires (`openai-chat` / `openai-responses`) point at `…/v1`, `anthropic` uses the bare hub address. The PROTOCOL column of `consumer list` / `GET /v1/catalog` shows these labels:
+
+| PROTOCOL | Endpoint | base_url | Who can use it |
+| --- | --- | --- | --- |
+| `anthropic` | `/v1/messages` | `https://hub.example.com` | Claude Code, the Anthropic SDK |
+| `openai-chat` | `/v1/chat/completions` | `https://hub.example.com/v1` | any OpenAI-compatible tool/SDK — opencode, zcode and other coding agents usually dial this |
+| `openai-responses` | `/v1/responses` | `https://hub.example.com/v1` | Codex CLI (default `wire_api`), opencode, Cline (OpenAI Native) — not Codex-only |
+
+A client may speak several wires (opencode speaks both OpenAI ones); pointing a chat-completions tool at an `openai-responses` alias (or vice versa) is a 404 (`unknown model alias … (no … offering under this alias)`).
+
 **OpenAI SDK / any OpenAI-compatible tool**
 
 ```ts
@@ -310,7 +320,7 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 
 Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`PRODUCER_MAX_USERS` = distinct-consumer cap; `QUOTA_EXCEEDED` = lifetime or daily token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
 
-Usage metering: one row per request (alias, real model, status, duration, byte counts, best-effort token counts), **zero content stored**. `aweshare hub list usage` (and `aweshare producer usage` on a producer's machine, scoped to its own models) answers "who used how much" by default: server-side aggregation on the hub's SQLite, one row per consumer × model — a person's rows stay together, busiest person and busiest model first — with request/error counts, best-effort token totals, an explicit unknown-token count (streaming backends that report no counts) and mean duration. The window defaults to 7 days and is printed with the table (`--since 30m\|12h\|7d\|…\|all`); `--group-by consumer` rolls up to per-person totals, `--group-by alias` to per-model totals. `--details` switches to the per-request log (`GET /admin/v1/usage`; admin sees everything, producers and consumers their own slice, rows carry the consumer/producer names).
+Usage metering: one row per request (alias, declared upstream model, response-reported model when available, status, duration, byte counts, best-effort token counts), **zero content stored**. `aweshare hub list usage` (and `aweshare producer usage` on a producer's machine, scoped to its own models) answers "who used how much" by default: server-side aggregation on the hub's SQLite, one row per consumer × model — a person's rows stay together, busiest person and busiest model first — with request/error counts, best-effort token totals, an explicit unknown-token count (streaming backends that report no counts) and mean duration. The window defaults to 7 days and is printed with the table (`--since 30m\|12h\|7d\|…\|all`); `--group-by consumer` rolls up to per-person totals, `--group-by alias` to per-model totals. `--details` switches to the per-request log (`GET /admin/v1/usage`; admin sees everything, producers and consumers their own slice, rows carry the consumer/producer names).
 
 ## Command reference
 
@@ -325,10 +335,11 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub produce [--host H] [--port N]` | run the hub with its own models attached — same as `serve`; the `[[backends]]`/`[[offerings]]` sections of `config.produce.toml` become `hub/…` offerings served in-process (keys in the data dir's secrets.json; edits hot-reload) |
 | `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `list invites --reveal`); `--expires-in` also bounds the lifetime of the token it mints — an expired key fails auth with 401 `TOKEN_EXPIRED` (`none` = code and identity never expire; identities minted before this change never expire); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
 | `aweshare hub list invites [--reveal] [--token] [--json]` | the invite ledger: every code, the identity it minted and its lifecycle (pending/used/suspended/revoked/expired; a redeemed code shows `expired` once its identity's expiry passes); `--reveal` re-shows the codes, `--token` the minted tokens with last seen |
-| `aweshare hub status` | the hub's live state: producer slots, the producer and consumer rosters (status, ONLINE live-tunnel state, last seen), offerings counted per deduplicated alias (several protocols → one verdict, the worst), a per-alias table — the same columns as `consumer list` and `producer list`, worst status first — with live occupancy (`IN USE n/max`) and today's remaining daily tokens, and a last-5m requests/ok-rate/errors line from the usage summary (hub-admission 429s are not metered) |
+| `aweshare hub status [--all]` | the hub's live state: producer slots, offerings counted per deduplicated alias (several protocols → one verdict, the worst), a per-alias table — the same columns as `consumer list` and `producer list`, worst status first — with live occupancy (`IN USE n/max`) and today's remaining daily tokens, and a last-5m requests/ok-rate/errors line from the usage summary (hub-admission 429s are not metered); identities appear as counts — `--all` prints the full producer/consumer rosters |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
 | `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | who used how much (default): aggregate per consumer × model, a person's rows together, busiest first — requests, errors, rate, best-effort token totals, unknown-token count, mean duration; window defaults to 7d and is printed with the table · `--details`: per-request log, newest first, zero content stored, each row naming its consumer |
 | `aweshare hub revoke --id N` · `aweshare hub restore --id N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
+| `aweshare hub offering block ALIAS` · `aweshare hub offering restore ALIAS` | the per-alias scalpel between doing nothing and revoking a whole producer: block one offering (every protocol row of the alias) — new requests get 503 `OFFERING_BLOCKED`, status shows `blocked`, the producer's other offerings keep serving. Manual blocks survive re-registers; auto blocks (model mismatch, see `autoBlockModelMismatch`) clear once the producer re-declares a different `upstreamModel` |
 
 Token issuance runs through invites (both roles). `limits` and `list usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too.
 
@@ -377,9 +388,12 @@ The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Do
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | redeem entry global insurance budget (valid-format attempts shared by every origin) |
 | `AWESHARE_INVITE_REDEEM_PER_IP_MIN` | 5 | redeem entry per-origin-IP bucket (`CF-Connecting-IP` behind a tunnel/proxy) — one visitor cannot monopolize admission; both keys reload via SIGHUP |
 | `AWESHARE_MAX_PRODUCERS` | 10 | max active producers — token issuance (admin API), invite redeem and restore refuse with `403 HUB_FULL` when full |
+| `AWESHARE_AUTO_BLOCK_MODEL_MISMATCH` | false | auto-block an offering after 2 consecutive successful responses report a different model than declared. Off by default: mismatches are logged once (flip) and visible in `hub status` / `consumer list` / `list usage --details` either way — the hub is report-only until the operator opts in. An auto block clears when the producer re-declares a different `upstreamModel`; an explicit manual `offering block` takes precedence and always persists; reloads via SIGHUP |
 | `AWESHARE_NO_UPDATE_CHECK` | unset | set to `1` to disable the passive update reminder |
 
 Health: agent heartbeats every 15s, silent 45s = dead; backends with 2 consecutive AUTH/QUOTA failures auto-degrade (alias shows `degraded`, dispatch stops), 30s probes recover. A new connection with the same producer token replaces the old one (latest-wins).
+
+Model honesty: an offering's `upstreamModel` is the producer's claim — the hub compares it with the bounded model id reported by each successful response (`model` / `message.model` / `response.model`). This is consistency evidence, not proof of the model's underlying weights: a producer or upstream router can still rewrite that metadata. The observation rides the existing usage meter, never rewrites the relayed response, and is scoped to the same alias, protocol and current declaration. It appears in the `OBSERVED MODEL` column, `list usage --details`, and `/v1/catalog` as `observedModel`, `observedAt`, `modelMatch` and the backward-compatible `modelVerified`. Comparison is token-aware: exact ids and explicit date/revision suffixes are affirmative; vendor prefixes are tolerated; adjacent variants such as `gpt-4`/`gpt-4o` and `gpt-4o`/`gpt-4o-mini` mismatch; a less-specific response is marked `?`/`insufficient`, not verified. Handling is tiered: default **report-only**, manual `hub offering block ALIAS` or whole-producer `hub revoke`, and opt-in auto-block after 2 consecutive mismatches. Manual blocks override automatic ones. `producer doctor` probes every distinct configured model and reports the response-named id with the same evidence boundary.
 
 Updating a npm install: `aweshare self-update` (asks before installing; `--check` only shows versions). The CLI also reminds you at most once a day when a newer npm release exists.
 

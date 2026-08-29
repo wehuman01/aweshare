@@ -124,6 +124,8 @@ base URL 恒为 `https://aweshare.wehuman.top`；路径取决于该别名的 pro
 
 调错端点会明确报错并指路——不存在静默翻译。
 
+典型客户端配对（`consumer list` 的 PROTOCOL 列显示为 `anthropic` / `openai-chat` / `openai-responses`）：`anthropic` ← Claude Code；`openai` ← 任何 OpenAI 兼容工具——opencode、zcode 等编程 agent 通常走这条；`responses` ← Codex CLI（默认 `wire_api`），但不止它——opencode、Cline（OpenAI Native）同样支持 Responses API。一个客户端可能两种 OpenAI 线都说（如 opencode），按你工具会说的方言挑别名的 protocol。
+
 ### 3. 一条 curl 验证通路
 
 ```bash

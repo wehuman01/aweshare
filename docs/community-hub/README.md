@@ -124,6 +124,8 @@ The base URL is always `https://aweshare.wehuman.top`; the path depends on the o
 
 Calling the wrong endpoint fails loudly with a pointer to the right one — nothing is silently translated.
 
+Typical client pairing (the PROTOCOL column of `consumer list` shows `anthropic` / `openai-chat` / `openai-responses`): `anthropic` ← Claude Code; `openai` ← any OpenAI-compatible tool — opencode, zcode and other coding agents usually dial this; `responses` ← Codex CLI (default `wire_api`), and not only Codex — opencode and Cline (OpenAI Native) also speak the Responses API. One client may speak both OpenAI wires (opencode does); pick the alias whose protocol your tool speaks.
+
 ### 3. One curl to prove the path
 
 ```bash

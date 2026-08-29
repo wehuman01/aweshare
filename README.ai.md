@@ -245,7 +245,7 @@ After setup:
 ```bash
 aweshare producer doctor            # full diagnosis, ordered to find the first failing link
 aweshare producer list              # registered offerings, live status, caps, occupancy, config drift
-aweshare hub status                 # rosters + offering health (admin context only)
+aweshare hub status [--all]         # offering health + capacity; --all adds rosters
 aweshare hub list usage                  # who used how much, aggregated per consumer × model
 aweshare self-update --check        # installed vs npm latest
 ```
@@ -270,7 +270,7 @@ aweshare producer doctor [--status]  # diagnosis (with --status: instant, no net
 aweshare producer list [--json]      # this producer's offerings + drift
 aweshare producer usage [...]        # who used this producer's models
 aweshare consumer list --hub URL --token asc_...   # hub catalog view
-aweshare hub status                          # capacity, rosters, offering health
+aweshare hub status [--all]                  # capacity + offering health; --all adds rosters
 aweshare hub list invites [--reveal|--token]        # invite ledger / codes / minted tokens
 aweshare hub limits NAME             # bare call views current overrides
 aweshare hub list usage [--details] [--group-by consumer|alias] [--since 7d]

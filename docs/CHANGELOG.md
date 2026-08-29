@@ -5,7 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
-## [0.5.6] - 2026-08-29
+## [0.5.7] - 2026-08-29
+
+### Added
+
+- **Model honesty audit and per-alias blocking** — the hub records the model each upstream actually self-reports (`observed_model`) alongside the producer's declared `upstream_model`, classifies every response as exact, compatible, mismatch, or insufficient evidence per alias/protocol/declaration, and shows `OBSERVED MODEL` in `hub status`, `producer list` and `consumer list` (insufficient evidence renders as `?`). Operators can block or restore a specific alias with the new admin endpoints and `offering block`/`restore` CLI subcommands.
+- **Optional auto-block on model mismatch** — `ModelWatch` warns on consecutive mismatches and, when `AWESHARE_AUTO_BLOCK_MODEL_MISMATCH=true`, auto-blocks the offering after repeated mismatches on successful responses (manual blocks take precedence; admin restores reset the strike window). Report-only by default.
+
+### Changed
+
+- **`hub status` defaults to a compact summary** — the live capacity and offering-health summary is shown by default; the full producer/consumer rosters require `--all`. The 5-minute health line now reads from the aggregated usage summary endpoint so it stays accurate.
+- **Stricter doctor model probes** — `producer doctor` probes each distinct configured model instead of a single request, and the model-consistency audit only counts successful responses toward auto-block strikes.
 
 ### Added
 

@@ -16,7 +16,7 @@ You may run these read-only commands:
 - `aweshare producer config show` (secrets redacted)
 - `aweshare producer doctor`
 - `aweshare hub list invites [--reveal] [--token]` — the invite ledger: lifecycle pending/used/suspended/revoked/expired; `--reveal` re-shows stored codes, `--token` shows the token each invite minted
-- `aweshare hub status` — live state: capacity, producer/consumer rosters (status, ONLINE, last seen) and the offering table (same columns as `consumer list`, worst status first, live occupancy and today's remaining daily tokens)
+- `aweshare hub status [--all]` — live state: capacity, counts and the offering table (same columns as `consumer list`, worst status first, live occupancy and today's remaining daily tokens); `--all` adds the full producer/consumer rosters
 - `aweshare hub list usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` — recent requests, newest first
 - `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
 
@@ -219,6 +219,8 @@ export ANTHROPIC_AUTH_TOKEN="<consumer token from hub operator>"
 export OPENAI_BASE_URL="https://<hub-host>/v1"
 export OPENAI_API_KEY="<consumer token>"
 ```
+
+Protocol pairing (an alias speaks exactly one wire — no translation, a mismatch is a 404): `anthropic` ← Claude Code / Anthropic SDK on `/v1/messages`, base URL without `/v1`; `openai-chat` ← any OpenAI-compatible agent (opencode, zcode, …) on `/v1/chat/completions`; `openai-responses` ← Codex CLI (default `wire_api`), opencode, Cline (OpenAI Native) on `/v1/responses` — not Codex-only, and both OpenAI wires share the `…/v1` base URL. Some clients speak several wires (opencode speaks both OpenAI ones).
 
 Remind consumers: traffic transits the hub in plaintext — only use a hub they trust.
 
