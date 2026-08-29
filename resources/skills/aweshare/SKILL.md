@@ -28,6 +28,8 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]` — show (bare), merge or clear one consumer's limit overrides
 - `aweshare hub invite revoke N`, `aweshare hub invite restore N` — kill / revive an invite; a redeemed one carries its identity (producer or consumer) with it
 - `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
+- `aweshare producer refresh ALIAS [--add N] [--clear]` · `aweshare producer refresh --all` — reopen an offering's daily token budget mid-day, hub-side and effective at once (works even while the agent is stopped): a bare call re-anchors today's window at this moment, `--add N` raises today's cap by N tokens until Beijing midnight, `--clear` drops both markers; `--all` bare-refreshes every one of this producer's offerings with a daily cap in one run (unlimited ones are reported and skipped). Own offerings only — hub-hosted models are the operator's
+- `aweshare hub produce refresh NAME [--add N] [--clear]` · `aweshare hub produce refresh --all` — the same verbs for hub-hosted `hub/…` models (`hub/` prefix optional); works on a running hub, no restart
 - `aweshare producer reload` — re-read config.toml + secrets.json and re-register the offerings on the open tunnel (no disconnect; a broken config keeps the previous values — check `producer doctor --status` for the log). Since v0.4.2 both processes stat-poll their config every 2s and apply valid edits automatically — `reload`/SIGHUP just skips that delay; only `hubUrl`/`token` changes need a restart
 
 The operator owns admission and access: one-time invite codes for both roles (the only admission path; every identity carries its invite handle from mint to suspension). A redeemed consumer key may call **every** offering on the hub — there are no per-alias grants. Guardrails are all hub-side and CLI-managed: per-consumer `limits`, per-offering caps (`maxConcurrentUsers`/`dailyTokens` from the producer's config), and `invite revoke`/`restore` suspension. The hub CLI covers admission and suspension (`invite` mint / revoke / restore), reads (`status` for live state, `list invites` for the ledger, `list usage` for the meter) and tuning (`limits`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too.
@@ -107,7 +109,7 @@ The hub reads `<dataDir>/config.toml` (Docker: `/data/config.toml`); `hub init` 
 | `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` (image: `/data`) | SQLite, pepper, admin token, config.toml — volume-mount it |
 | `AWESHARE_HUB_HOST` · `AWESHARE_HUB_PORT` | `0.0.0.0` · `8787` | listen address for `serve` |
 | `AWESHARE_CONSUMER_RPS` · `AWESHARE_CONSUMER_BURST` · `AWESHARE_CONSUMER_CONCURRENCY` | `10` · `20` · `8` | hub-wide per-consumer defaults |
-| `AWESHARE_HEAD_TIMEOUT_MS` · `AWESHARE_IDLE_TIMEOUT_MS` | `120000` · `300000` | response-head timeout / stream idle timeout |
+| `AWESHARE_HEAD_TIMEOUT_MS` · `AWESHARE_IDLE_TIMEOUT_MS` | `120000` · `120000` | response-head timeout / stream idle timeout |
 | `AWESHARE_MAX_BODY_BYTES` | `32MB` | request body cap |
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | `10` | rate limit for the unauthenticated invite-redeem endpoint |
 | `AWESHARE_MAX_PRODUCERS` | `10` | max active producers — issue/redeem/restore refuse with `403 HUB_FULL` when full |

@@ -3,6 +3,19 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [Unreleased]
+
+## [0.5.9] - 2026-08-29
+
+### Added
+
+- **`refresh --all` on both CLIs** — `aweshare producer refresh --all` bare-refreshes every one of the producer's registered offerings, `aweshare hub produce refresh --all` every hub-hosted `hub/…` model, in one command instead of one per alias. The selection dedupes by alias (an alias serving several protocol rows is refreshed once) and skips unlimited offerings (`dailyTokens = 0`), reporting them instead — the endpoint would answer `NO_DAILY_CAP`. One failure does not stop the rest; the run exits nonzero and `--json` prints one entry per alias (`skipped`/`error` markers included). `--all` is bare-only: per-offering `--add`/`--clear` stay single-alias.
+
+### Fixed
+
+- **Refresh output times now render in the display zone** — the `resets …` and bonus `until …` timestamps the refresh commands print were raw UTC ISO (the refresh feature landed one commit after the timezone-aware display change and missed it). They now render like every other CLI time (default `Asia/Shanghai`, `AWESHARE_TIMEZONE` overrides); `--json` keeps the raw UTC ISO. Also corrected the Chinese README's stale claim that `dailyTokens` rolls at UTC midnight — it has always rolled at Beijing midnight, as the English README already said.
+- **Documentation sync** — both READMEs' env tables and the packaged skill still listed the pre-0.5.8 `IDLE_TIMEOUT_MS` default (300000; the default has been 120000 since v0.5.8), and the Chinese README's command tables were missing the `refresh` rows the English README has (both now include `--all`).
+
 ## [0.5.8] - 2026-08-29
 
 ### Added

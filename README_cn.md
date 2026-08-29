@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.8-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.9-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -255,7 +255,7 @@ backend = "ollama"
 upstreamModel = "qwen2.5:7b"             # 必须是后端真实 ID（ollama list 的完整 tag）
 maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并发请求数
 # maxConcurrentUsers = 3                 # 同时在用的不同消费者数（hub 默认 3）
-# dailyTokens = 1000000                  # 每日共享 token 额度（UTC 日，默认 100 万；0 = 无上限）
+# dailyTokens = 1000000                  # 每日共享 token 额度（按北京时间日，默认 100 万；0 = 无上限）
 ```
 
 一条 offering 恰好暴露一个上游模型：消费者调用别名，hub 在转发前把请求里的 model 强制改写为 `upstreamModel`——他们永远无法选用其他模型。想多开放模型就多写几条 `[[offerings]]`。
@@ -268,7 +268,7 @@ maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并�
 |---|---|---|---|
 | `maxConcurrencyPerUser` | 1 | **单个消费者**在该别名上的并发请求数上限 | 429 `PRODUCER_MAX_CONCURRENCY` |
 | `maxConcurrentUsers` | 3 | 该别名上同时有进行中请求的**不同消费者数**上限 | 429 `PRODUCER_MAX_USERS` |
-| `dailyTokens` | 1000000 | 该别名每 **UTC 日**跨消费者合计的 token（prompt+completion）额度；`0` = 无上限 | 429 `QUOTA_EXCEEDED`（UTC 午夜重置） |
+| `dailyTokens` | 1000000 | 该别名每 **北京日**（UTC+8）跨消费者合计的 token（prompt+completion）额度；`0` = 无上限 | 429 `QUOTA_EXCEEDED`（北京时间午夜重置） |
 
 `maxConcurrencyPerUser` 限的是每个消费者的并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——某消费者要并发发 5 个请求需要自己的 `maxConcurrencyPerUser ≥ 5`；该别名的总并发理论上限是 `maxConcurrentUsers × maxConcurrencyPerUser`。日额度统计已记录用量（见下文「诚实的限制」）。（v0.4.3 由 `maxConcurrency` 改名而来，旧键限的是别名总并发。）
 
@@ -339,6 +339,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
 | `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，同一个人的行聚在一起，最忙在前——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印 · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
 | `aweshare hub offering block ALIAS` · `aweshare hub offering restore ALIAS` | 按别名封禁 / 解封的"手术刀"：封一个 offering（该别名的全部协议行）——新请求返回 503 `OFFERING_BLOCKED`，状态显示 `blocked`，同 producer 的其他 offering 不受影响。手动封禁在 producer 重新注册后依然保留；自动封禁（模型不符，见 `autoBlockModelMismatch`）在 producer 改报不同的 `upstreamModel` 后自动解除 |
+| `aweshare hub produce refresh NAME [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | 当日中途重开某个 hub 自有模型的 token 额度（`hub/` 前缀可省）：裸调用把今日窗口重新起算，`--add N` 把今日上限提高 N 个 token 直到北京时间午夜，`--clear` 清掉两个标记。仅限 hub 自有（`hub/…`）模型——producer 的模型归它自己刷新。`--all` 一条命令裸刷新全部有日限额的 `hub/…` 模型（无限额的会提示跳过；单个失败不中断其余） |
 
 令牌签发统一走邀请码（两种角色）。`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。
 
@@ -357,6 +358,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare producer status` | 一眼摘要：本地进程、配置计数、已注册模型健康汇总与漂移——完整表格看 `list offerings` |
 | `aweshare producer start [--background]` | 连接并转发（长驻进程；`--background` 转入后台——日志写 `~/.aweshare/producer.log`，pid 写 `producer.pid`） |
 | `aweshare producer reload` | 通知后台 producer（SIGHUP）重读 `config.toml` + `secrets.json`，并在既有隧道上重新注册 offerings——不断连；配置有误时保留旧值继续服务 |
+| `aweshare producer refresh ALIAS [--add N] [--clear] [--json]` · `aweshare producer refresh --all [--json]` | 当日中途重开本 producer 的某个模型，hub 侧即时生效（producer 停着也能用）：裸调用把今日窗口重新起算——之前的用量不再计数；`--add N` 把今日上限提高 N 个 token 直到北京时间午夜（替换早前的加成）；`--clear` 清掉两个标记。仅限自己的模型，永久调高请改 `dailyTokens`（热加载）。`--all` 一条命令裸刷新全部有日限额的注册模型（无限额的会提示跳过；单个失败不中断其余） |
 | `aweshare producer stop` | 停止后台 producer（SIGTERM，10 秒后 SIGKILL）并清理 pidfile |
 
 **消费者侧**——两条命令，跑在消费者机器上；日常使用时标准 SDK 直连 hub（见「消费工具配置」）：
@@ -383,7 +385,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 | `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | 数据目录（SQLite/pepper/admin token/config.toml，挂卷即备份） |
 | `AWESHARE_HUB_PORT` / `HOST` | 8787 / 0.0.0.0 | 监听 |
 | `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | 每消费者限流 |
-| `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 300000 | 响应头超时 / 流空闲超时 |
+| `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 120000 | 响应头超时 / 流空闲超时 |
 | `AWESHARE_MAX_BODY_BYTES` | 32MB | 请求体上限 |
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | 兑换入口的全局保险额度（格式合法的尝试，全体来源共享） |
 | `AWESHARE_INVITE_REDEEM_PER_IP_MIN` | 5 | 兑换入口的每来源 IP 桶（隧道/代理后取 `CF-Connecting-IP`）——单个访客无法垄断入场；两个键都支持 SIGHUP 热加载 |
