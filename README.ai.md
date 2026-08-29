@@ -233,7 +233,7 @@ Remind the consumer: prompts and responses transit the hub in plaintext — only
    ```
    Consumers redeem codes themselves (`aweshare consumer join`); producers via `aweshare producer join`.
 3. Administering a remote hub: run admin commands on the server (`ssh` + CLI, or `docker exec aweshare-hub aweshare hub ...`), or locally with `AWESHARE_HUB_URL=https://<hub-host>` plus the admin-token file in a local data dir — otherwise they fail with "no admin token" / connection refused.
-4. Guardrails you can tune on request: per-consumer `aweshare hub limits NAME [--rps N] [--tpm N] [--max-total-tokens N] ...`, suspension `aweshare hub revoke --id N` / `restore --id N` (reversible, invite-keyed).
+4. Guardrails you can tune on request: per-consumer `aweshare hub limits NAME [--rps N] [--tpm N] [--max-total-tokens N] ...`, suspension `aweshare hub invite revoke N` / `restore N` (reversible, invite-keyed).
 5. Security notes for the operator: keep :8787 off the public internet behind TLS; a redeemed consumer key can call **every** offering on the hub; tokens/codes stored plaintext-recoverable (`hub list invites --reveal` / `--token`) means a data-dir leak exposes identities — guard it.
 
 ---
@@ -268,7 +268,8 @@ aweshare producer config path        # config/secrets locations
 aweshare producer config show        # config, secrets redacted
 aweshare producer doctor [--status]  # diagnosis (with --status: instant, no network)
 aweshare producer list [--json]      # this producer's offerings + drift
-aweshare producer usage [...]        # who used this producer's models
+aweshare producer list usage [...]   # who used this producer's models
+aweshare producer status             # one-glance summary: process, config counts, health rollup
 aweshare consumer list --hub URL --token asc_...   # hub catalog view
 aweshare hub status [--all]                  # capacity + offering health; --all adds rosters
 aweshare hub list invites [--reveal|--token]        # invite ledger / codes / minted tokens
@@ -287,7 +288,7 @@ aweshare producer reload                               # re-read config + re-reg
 aweshare hub init                                      # create data dir + admin token (printed once!)
 aweshare hub invite [--role producer|consumer] ...     # mint one-time codes (printed once)
 aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]
-aweshare hub revoke --id N / restore --id N            # reversible suspension, by invite handle
+aweshare hub invite revoke N / restore N            # reversible suspension, by invite handle
 ```
 
 User-only commands (long-running, TTY-confirming, or one-time-secret-printing):

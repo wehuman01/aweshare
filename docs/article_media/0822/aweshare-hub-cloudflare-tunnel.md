@@ -27,7 +27,7 @@ Hub 不再对公网开应用端口。`cloudflared` 从服务器主动往外连�
 
 GitHub：[github.com/wehuman01/aweshare](https://github.com/wehuman01/aweshare)
 
-根据这次部署留下的记录，2026-08-20 从两个网络跑 `curl https://aweshare.wehuman.top/healthz` 都拿到了 200；DNS 查到的是 Cloudflare 的边缘 IP，不是源站。
+部署那天我留了实测记录：2026-08-20 从两个网络跑 `curl https://aweshare.wehuman.top/healthz`，都拿到了 200；DNS 查到的是 Cloudflare 边缘 IP，不是源站。
 
 当然，这只是当天的实测，不是“现在肯定还这样”的保证。真要照着搭，Tunnel、Compose 网络、WAF 和镜像版本还是要重新检查一遍。
 
@@ -101,11 +101,11 @@ Cloudflare Access 也别把整站一锅端。SDK 和 producer agent 碰上网页
 
 一句话总结：Tunnel 没让 aweshare 多长出一层复杂架构——它只是把“谁来面对公网”这件事交给了更适合干它的那一层，Hub 继续转发能力，producer 继续守住密钥，该谁干的活还是谁干。
 
-## 试用
+## 试试
 
-### 让智能体来装
+### 让 AI agent 帮你装
 
-如果你正在 Claude Code、Codex 或任何编程智能体里，直接对它说：
+在 Claude Code、Codex 或任何编程 agent 里说一句：
 
 ```text
 Read https://github.com/wehuman01/aweshare/blob/main/README.ai.md and follow it to install and configure aweshare.
@@ -131,6 +131,12 @@ curl https://your-hub.example.com/healthz
 ```
 
 然后记住三个坑：绿色不等于通了、502 不一定是 Tunnel 的锅、藏门不等于上锁。
+
+## 现在就申请
+
+消费者 10 个名额，先到先得；生产者不设限，随时欢迎。
+
+发邮件到 [peng@wehuman.top](mailto:peng@wehuman.top)，说明你是谁、想共享还是使用，以及准备接入什么后端。aweshare 本身的 bug 请提交至 [GitHub issues](https://github.com/wehuman01/aweshare/issues)。
 
 ## More from mugpeng
 

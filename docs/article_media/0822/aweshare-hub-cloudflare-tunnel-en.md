@@ -134,6 +134,12 @@ curl https://your-hub.example.com/healthz
 
 Then remember the three traps: green is not through, a 502 is not always the Tunnel, and hiding the door is not locking it.
 
+## Apply Now
+
+10 consumer spots, first come first served; producers uncapped, welcome anytime.
+
+Email [peng@wehuman.top](mailto:peng@wehuman.top) — who you are, whether you want to share or consume, and what backend you'll bring. Bugs in aweshare itself go to [GitHub issues](https://github.com/wehuman01/aweshare/issues).
+
 ## More from mugpeng
 
 aweshare is part of the aweteam ecosystem:

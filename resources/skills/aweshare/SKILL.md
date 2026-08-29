@@ -16,7 +16,7 @@ You may run these read-only commands:
 - `aweshare producer config show` (secrets redacted)
 - `aweshare producer doctor`
 - `aweshare hub list invites [--reveal] [--token]` — the invite ledger: lifecycle pending/used/suspended/revoked/expired; `--reveal` re-shows stored codes, `--token` shows the token each invite minted
-- `aweshare hub status [--all]` — live state: capacity, counts and the offering table (same columns as `consumer list`, worst status first, live occupancy and today's remaining daily tokens); `--all` adds the full producer/consumer rosters
+- `aweshare hub status [--all]` — live state: capacity, counts and the offering table (same columns as `consumer list`, worst status first, live occupancy and today's remaining daily tokens), plus an "admission rejections" section when 429s have been throttling requests (top code/alias/consumer cells since hub start — the tuning evidence for `limits` and per-offering caps); `--all` adds the full producer/consumer rosters
 - `aweshare hub list usage [--consumer NAME] [--alias ns/model] [--limit N] [--json]` — recent requests, newest first
 - `aweshare self-update --check` (current vs npm latest; plain `self-update` needs a TTY — see Self-Update)
 
@@ -26,15 +26,15 @@ You may also run these commands (they modify files/state but are non-interactive
 - `aweshare hub init`
 - `aweshare hub invite [--role producer|consumer] [--name NAME] [--count N] [--expires-in D]` — mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `hub list invites --reveal`); consumers need `--role consumer --name NAME`
 - `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]` — show (bare), merge or clear one consumer's limit overrides
-- `aweshare hub revoke --id N`, `aweshare hub restore --id N` — kill / revive an invite; a redeemed one carries its identity (producer or consumer) with it
+- `aweshare hub invite revoke N`, `aweshare hub invite restore N` — kill / revive an invite; a redeemed one carries its identity (producer or consumer) with it
 - `aweshare producer join --hub URL --code asi_… [--name NAME --email YOU@EXAMPLE.COM]` — redeem an invite code into a producer token and write it into the config
 - `aweshare producer reload` — re-read config.toml + secrets.json and re-register the offerings on the open tunnel (no disconnect; a broken config keeps the previous values — check `producer doctor --status` for the log). Since v0.4.2 both processes stat-poll their config every 2s and apply valid edits automatically — `reload`/SIGHUP just skips that delay; only `hubUrl`/`token` changes need a restart
 
-The operator owns admission and access: one-time invite codes for both roles (the only admission path; every identity carries its invite handle from mint to suspension). A redeemed consumer key may call **every** offering on the hub — there are no per-alias grants. Guardrails are all hub-side and CLI-managed: per-consumer `limits`, per-offering caps (`maxConcurrentUsers`/`dailyTokens` from the producer's config), and `revoke`/`restore` suspension. The hub CLI covers admission (`invite`), reads (`status` for live state, `list invites` for the ledger, `list usage` for the meter), tuning (`limits`) and suspension (`revoke`/`restore`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too.
+The operator owns admission and access: one-time invite codes for both roles (the only admission path; every identity carries its invite handle from mint to suspension). A redeemed consumer key may call **every** offering on the hub — there are no per-alias grants. Guardrails are all hub-side and CLI-managed: per-consumer `limits`, per-offering caps (`maxConcurrentUsers`/`dailyTokens` from the producer's config), and `invite revoke`/`restore` suspension. The hub CLI covers admission and suspension (`invite` mint / revoke / restore), reads (`status` for live state, `list invites` for the ledger, `list usage` for the meter) and tuning (`limits`) — thin wrappers over the admin REST API (`/admin/v1/*`), so curl works too.
 
 ## Suspension semantics (hub)
 
-Revocation is **reversible suspension**, never deletion, and the invite is the operator's handle: `hub revoke --id N` suspends (a pending code stops pairing; a redeemed one suspends the identity it minted — a producer's tunnel closes at once, a consumer's key gets `401 TOKEN_REVOKED`); `hub restore --id N` brings both back. An invite and its minted identity move together; restoring a redeemed producer needs a free slot (`403 HUB_FULL` when `AWESHARE_MAX_PRODUCERS`, default 10, active producers are reached — the cap also gates invite redeem; consumers have no cap).
+Revocation is **reversible suspension**, never deletion, and the invite is the operator's handle: `hub invite revoke N` suspends (a pending code stops pairing; a redeemed one suspends the identity it minted — a producer's tunnel closes at once, a consumer's key gets `401 TOKEN_REVOKED`); `hub invite restore N` brings both back. An invite and its minted identity move together; restoring a redeemed producer needs a free slot (`403 HUB_FULL` when `AWESHARE_MAX_PRODUCERS`, default 10, active producers are reached — the cap also gates invite redeem; consumers have no cap).
 
 ## Intent Router
 
@@ -46,7 +46,7 @@ Revocation is **reversible suspension**, never deletion, and the invite is the o
 | "Where is the config?" | Config Path | `aweshare producer config path` |
 | "Show my config" | Config Show | `aweshare producer config show` |
 | "Something doesn't work" | Diagnose | `aweshare producer doctor` — fix the first FAIL |
-| "Suspend / bring back a user or token" | Hub admin | `aweshare hub revoke --id N` / `restore --id N` (by invite, reversible — see Suspension semantics) |
+| "Suspend / bring back a user or token" | Hub admin | `aweshare hub invite revoke N` / `restore N` (by invite, reversible — see Suspension semantics) |
 | "Who can use what?" | Browse | Every admitted consumer can call every offering; see who is admitted in the `aweshare hub status` rosters and what is shared via the consumer catalog (`aweshare consumer list`) |
 | "Set up a hub" | Hub setup | npm or Docker — see Hub Deployment; `init` prints the admin token once; user runs `serve`/container themselves |
 | "Issue a consumer token (asc_)" | Hub admin | `aweshare hub invite --role consumer --name NAME` (bound, single); the consumer redeems the code themselves with `aweshare consumer join` and keeps the printed `asc_` token — see Admission via Invite Codes |
@@ -91,7 +91,7 @@ The repo also ships a `docker-compose.yml` (port, volume, limit-tuning env vars)
 
 ### Administering a remote hub
 
-Hub CLI admin commands (`invite`, `list`, `limits`, `usage`, `revoke`, `restore`) read the admin token file `<AWESHARE_HUB_DATA_DIR>/admin-token` and call the admin API at `AWESHARE_HUB_URL` (default `http://127.0.0.1:8787`). When the hub runs on a server:
+Hub CLI admin commands (`invite`, `list`, `limits`, `status`, `offering`) read the admin token file `<AWESHARE_HUB_DATA_DIR>/admin-token` and call the admin API at `AWESHARE_HUB_URL` (default `http://127.0.0.1:8787`). When the hub runs on a server:
 
 - run the commands on the server (`ssh` + CLI, or `docker exec aweshare-hub aweshare hub invite ...`), or
 - run them locally with `AWESHARE_HUB_URL=https://<hub-host>` and the admin-token file placed in a local `AWESHARE_HUB_DATA_DIR`.
@@ -134,7 +134,7 @@ aweshare consumer join --hub https://<hub-host> --code asi_...
 # curl -s -X POST https://<hub-host>/invites/v1/redeem -H 'content-type: application/json' -d '{"code":"asi_..."}'
 ```
 
-Codes are single-use, optionally expiring, and revocable at any stage (`hub list invites` shows pending/used/suspended/revoked/expired; `hub revoke --id N`, undo with `hub restore --id N`). Revoking a **redeemed** code suspends the identity it minted (a producer's token dies and tunnel closes; a consumer's key is suspended) — one code, one identity; restore revives both. Both `join` commands assert their role, so handing a code to the wrong one fails with `409 INVITE_ROLE_MISMATCH` without burning the code. `hub list invites --reveal` re-shows stored codes; `hub list invites --token` re-shows each minted token with when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full; consumers uncapped). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, start).
+Codes are single-use, optionally expiring, and revocable at any stage (`hub list invites` shows pending/used/suspended/revoked/expired; `hub invite revoke N`, undo with `hub invite restore N`). Revoking a **redeemed** code suspends the identity it minted (a producer's token dies and tunnel closes; a consumer's key is suspended) — one code, one identity; restore revives both. Both `join` commands assert their role, so handing a code to the wrong one fails with `409 INVITE_ROLE_MISMATCH` without burning the code. `hub list invites --reveal` re-shows stored codes; `hub list invites --token` re-shows each minted token with when it was last seen. Redeem respects the active-producer cap (`AWESHARE_MAX_PRODUCERS`, default 10; `403 HUB_FULL` when full; consumers uncapped). After a successful join, continue with the normal first-time producer setup (edit backends/offerings, doctor, start).
 
 ## Producer Config Structure (config.toml)
 

@@ -56,9 +56,33 @@ The most common scene is a group of friends: one contributes a GPU running open 
 
 Across the whole arrangement, nobody passes keys around the group chat, nobody but the gatekeeper needs to buy a server, and everyone's exit cost is near zero: the producer stops the program, the consumer deletes two lines of config. That's all.
 
-Want to try it? Email [peng@wehuman.top](mailto:peng@wehuman.top) — say who you are and which role you want. Problems with aweshare itself go to [GitHub issues](https://github.com/wehuman01/aweshare/issues).
-
 GitHub: [github.com/wehuman01/aweshare](https://github.com/wehuman01/aweshare)
+
+## Try It
+
+### Let the agent install it
+
+In Claude Code, Codex, or any coding agent, say:
+
+```text
+Read https://github.com/wehuman01/aweshare/blob/main/README.ai.md and follow it to install and configure aweshare.
+```
+
+### Or do it yourself
+
+```bash
+npm install -g aweshare
+
+# To share (producer): aweshare producer init
+# To consume: aweshare consumer join --hub <URL> --code asi_...
+# To keep the gate (operator): aweshare hub init && aweshare hub invite
+```
+
+## Apply Now
+
+10 consumer spots, first come first served; producers uncapped, welcome anytime.
+
+Email [peng@wehuman.top](mailto:peng@wehuman.top) — who you are, whether you want to share or consume, and what backend you'll bring. Bugs in aweshare itself go to [GitHub issues](https://github.com/wehuman01/aweshare/issues).
 
 ## More from mugpeng
 
