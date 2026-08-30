@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.9-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -56,7 +56,7 @@
 
 - 为完成路由与计量，**消费者的提示词与模型响应都会经过 Hub，不是端到端加密**。Hub 不持久化任何请求/响应内容，但 Hub 运维者技术上可见明文——请只使用你信得过的 Hub 实例（这也是 Hub 开源 + 自建部署的意义）。
 - 上游 API Key 永不离开生产者设备，也不会发给消费者。令牌在库内**有意存两份**：加盐 SHA-256 哈希用于认证，明文同时保留，运维者可用 `hub list invites --token` 把弄丢的令牌交还本人。邀请码同理——明文可通过 `hub list invites --reveal` 找回。数据库泄露会暴露全部身份，请妥善保管数据目录。
-- 令牌吊销是**可逆挂起**（`hub invite revoke N` / `hub invite restore N`，按邀请码操作），且邀请码与它换出的生产者同进退：撤销已兑换的码即挂起对应生产者（并断开其隧道），从任一侧 restore 都同时救回两者。吊销不删除任何数据——offerings 与用量记录在挂起期间完整保留。
+- 令牌吊销是**可逆挂起**（`hub admin invite revoke N` / `hub admin invite restore N`，按邀请码操作），且邀请码与它换出的生产者同进退：撤销已兑换的码即挂起对应生产者（并断开其隧道），从任一侧 restore 都同时救回两者。吊销不删除任何数据——offerings 与用量记录在挂起期间完整保留。
 
 ### 合规与免责
 
@@ -92,11 +92,7 @@ aweshare hub init        # 数据在 ~/.aweshare-hub；打印 admin token，抄�
 aweshare hub serve       # 监听 :8787（前面套 Caddy/nginx 做 TLS）
 ```
 
-hub 自己也能挂模型，不需要 producer 机器：在 `~/.aweshare-hub/config.produce.toml` 里加 `[[backends]]`/`[[offerings]]` 段（格式与 producer 配置相同，别名命名空间 `hub/…`），上游 key 放 `~/.aweshare-hub/secrets.json`，然后：
-
-```bash
-aweshare hub produce    # serve + hub 自有模型；消费者照常调 hub/<name>
-```
+hub 自己也能挂模型，不需要 producer 机器：用 `aweshare hub produce init` 生成脚手架，在 `~/.aweshare-hub/config.produce.toml` 里加 `[[backends]]`/`[[offerings]]` 段（格式与 producer 配置相同，别名命名空间 `hub/…`），上游 key 放 `~/.aweshare-hub/secrets.json`，然后照常 `aweshare hub serve`——目录自动挂载，消费者照常调 `hub/<name>`
 
 **docker**：
 
@@ -110,10 +106,10 @@ docker exec aweshare-hub aweshare hub init   # 首次：生成 admin token，抄
 
 ```bash
 # 绑定：码锁定某个名字（"邀请某个用户"）
-aweshare hub invite --name peng [--expires-in 7d]      # → asi_...，发给生产者
+aweshare hub admin invite mint --name peng [--expires-in 7d]      # → asi_...，发给生产者
 
 # 不绑定：批量发放；生产者兑换时自己提交 name + email（写入 hub）
-aweshare hub invite --count 10 [--expires-in 7d]
+aweshare hub admin invite mint --count 10 [--expires-in 7d]
 
 # 生产者自行兑换（不需要传递令牌本身）：
 aweshare producer join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
@@ -122,7 +118,7 @@ aweshare producer join --hub https://hub.example.com --code asi_... [--name NAME
 消费者以同样方式加入——consumer 邀请码兑换后得到消费者自己保管的 `asc_` 密钥：
 
 ```bash
-aweshare hub invite --role consumer --name alice [--expires-in 7d]   # → asi_...，发给消费者
+aweshare hub admin invite mint --role consumer --name alice [--expires-in 7d]   # → asi_...，发给消费者
 
 # 消费者自己兑换（asc_ 只打印一次，附可直接粘贴的 SDK 环境变量——当场保存，之后不再显示）：
 aweshare consumer join --hub https://hub.example.com --code asi_...
@@ -136,13 +132,13 @@ aweshare consumer join --hub https://hub.example.com --code asi_...
 
 | 角色 | 谁持有 | 怎么用 |
 |---|---|---|
-| `admin` | Hub 操作者（只有你） | admin REST API（`/admin/v1/*`）；CLI 侧：`hub invite`（铸造）/ `invite revoke\|restore` / `list invites` / `status` |
+| `admin` | Hub 操作者（只有你） | admin REST API（`/admin/v1/*`）；CLI 侧：`hub admin invite mint` / `admin invite revoke\|restore` / `admin offering revoke\|restore` / `list` / `status` |
 | `producer`（`asp_...`） | 生产者机器上的 agent | 写进 `~/.aweshare/config.toml` 的 `token` 字段，agent 靠它向 hub 注册 offering |
 | `consumer`（`asc_...`） | 调用模型的一方 | 填在 SDK 环境变量（`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`）里，hub 靠它识别消费者并做计量、限额与挂起 |
 
 `name` 即生产者的别名命名空间（`peng/gpt-4o` 的 `peng/`）。
 
-**准入完全归运营者**：两种角色统一走一次性邀请码（唯一准入路径，每个身份的全生命周期都带着邀请码这个把手）。兑换成功的消费者密钥可调用 hub 上**全部** offering——放谁进来，谁就能用共享的一切。兜底手段：按消费者的 `hub limits`（限流、并发、token 预算）、按 offering 的限额（`maxConcurrentUsers`、`dailyTokens`）与 `hub invite revoke` 挂起，全部由 hub 强制执行。
+**准入完全归运营者**：两种角色统一走一次性邀请码（唯一准入路径，每个身份的全生命周期都带着邀请码这个把手）。兑换成功的消费者密钥可调用 hub 上**全部** offering——放谁进来，谁就能用共享的一切。兜底手段：按消费者的 `hub limits`（限流、并发、token 预算）、按 offering 的限额（`maxConcurrentUsers`、`dailyTokens`）与 `hub admin invite revoke` 挂起，全部由 hub 强制执行。
 
 #### 2. 生产者首跑（按顺序）
 
@@ -330,20 +326,23 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | 命令 | 用途 |
 |---|---|
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
-| `aweshare hub serve [--host H] [--port N]` | 启动 hub |
-| `aweshare hub produce [--host H] [--port N]` | 启动 hub 并挂上自有模型——与 `serve` 同一进程；`config.produce.toml` 的 `[[backends]]`/`[[offerings]]` 段注册为 `hub/…` offering，由 hub 进程直接服务（key 在数据目录的 secrets.json；改动热加载） |
-| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `list invites --reveal` 重新查看）；`--expires-in` 同时限定其铸造令牌的寿命——到期后认证返回 401 `TOKEN_EXPIRED`、在线隧道在下一个心跳被关闭（`none` 表示码与身份都永不过期；此变更之前铸造的身份永不过期）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
-| `aweshare hub invite revoke N` · `aweshare hub invite restore N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
+| `aweshare hub serve [--host H] [--port N]` | 启动 hub——唯一 runner；数据目录里有 `config.produce.toml` 就自动挂载：其 `[[backends]]`/`[[offerings]]` 段注册为 `hub/…` offering，由 hub 进程直接服务（key 在数据目录的 secrets.json；改动热加载） |
+| `aweshare hub produce init` | 生成 `config.produce.toml` 脚手架和空 `secrets.json`（已存在则保留）；同时初始化数据目录、数据库、pepper 和 admin token |
+| `aweshare hub admin invite mint [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `list invites --reveal` 重新查看）；`--expires-in` 同时限定其铸造令牌的寿命——到期后认证返回 401 `TOKEN_EXPIRED`、在线隧道在下一个心跳被关闭（`none` 表示码与身份都永不过期；此变更之前铸造的身份永不过期）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
+| `aweshare hub admin invite revoke N` · `aweshare hub admin invite restore N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
+| `aweshare hub admin offering revoke ALIAS` · `aweshare hub admin offering restore ALIAS` | 按别名吊销 / 恢复的"手术刀"：吊销一个 offering（该别名的全部协议行）——新请求返回 503 `OFFERING_BLOCKED`，`list offerings` 显示 `blocked`，同 producer 的其他 offering 不受影响。手动吊销在 producer 重新注册后依然保留；自动吊销（模型不符，见 `autoBlockModelMismatch`）在 producer 改报不同的 `upstreamModel` 后自动解除 |
+| `aweshare hub list [invites\|producers\|consumers\|offerings\|usage]` | 读 hub 状态，一个名词一张表（默认 invites） |
 | `aweshare hub list invites [--reveal] [--token] [--json]` | 邀请码台账：每个码、它换出的身份与生命周期（pending/used/suspended/revoked/expired；已兑换的码在身份过期后显示 `expired`）；`--reveal` 显码，`--token` 连同铸造令牌与最近活跃一起显示 |
-| `aweshare hub status [--all]` | hub 实时状态：producer 席位、按去重 alias 计数的模型健康（一个别名多协议只算一个、取最差状态）、per-alias 表——列与 `consumer list`/`producer list` 完全一致、问题状态在前——含实时占用（`IN USE n/max`）与当日剩余 token，以及来自用量汇总的最近 5 分钟请求/成功率/错误行（hub 准入类 429 不计量）；身份默认只显示计数，`--all` 才打印完整 producer/consumer 名册 |
+| `aweshare hub list producers [--json]` · `aweshare hub list consumers [--json]` | 名册：名字、状态（active/suspended/built-in）、在线与否（producers）、最近活跃、创建时间 |
+| `aweshare hub list offerings [--json]` | 目录：按去重 alias 计数的模型健康（一个别名多协议只算一个、取最差状态），一个别名一行——列与 `consumer list`/`producer list` 完全一致、问题状态在前——含自报模型、限额、实时占用（`IN USE n/max`）与当日剩余 token |
+| `aweshare hub status` | 实时仪表盘：容量（producer 席位、consumer 数、offering 计数）、来自用量汇总的最近 5 分钟请求/成功率/错误行（hub 准入类 429 不计量）、准入拒绝压力（被限流最狠的 alias/消费者）与生效的消费者默认限额 |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
 | `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，同一个人的行聚在一起，最忙在前——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印 · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
-| `aweshare hub offering block ALIAS` · `aweshare hub offering restore ALIAS` | 按别名封禁 / 解封的"手术刀"：封一个 offering（该别名的全部协议行）——新请求返回 503 `OFFERING_BLOCKED`，状态显示 `blocked`，同 producer 的其他 offering 不受影响。手动封禁在 producer 重新注册后依然保留；自动封禁（模型不符，见 `autoBlockModelMismatch`）在 producer 改报不同的 `upstreamModel` 后自动解除 |
 | `aweshare hub produce refresh NAME [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | 当日中途重开某个 hub 自有模型的 token 额度（`hub/` 前缀可省）：裸调用把今日窗口重新起算，`--add N` 把今日上限提高 N 个 token 直到北京时间午夜，`--clear` 清掉两个标记。仅限 hub 自有（`hub/…`）模型——producer 的模型归它自己刷新。`--all` 一条命令裸刷新全部有日限额的 `hub/…` 模型（无限额的会提示跳过；单个失败不中断其余） |
 
-令牌签发统一走邀请码（两种角色）。`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。
+令牌签发统一走邀请码（两种角色）。`admin`、`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。
 
-`list invites`、`list usage` 与 `status`默认输出对齐表格；（如文档所列）加 `--json` 可获取原始 API 响应。
+`list` 的每张表与 `status` 默认输出对齐表格；（如文档所列）加 `--json` 可获取原始 API 数据。
 
 **生产者侧**——运行在生产者（即带后端）的那台机器上：
 
@@ -378,7 +377,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 
 **热加载**：除 host/port 外，表中所有可调参数都支持运行中 `SIGHUP` 生效（`kill -HUP <pid>`；Docker 用 `docker kill -s HUP aweshare-hub`）——先校验新文件，写坏了只记日志、继续用旧值服务。环境变量在进程启动时就固定了，被 `AWESHARE_*` 钉住的键不受重载影响（与启动时同一优先级）；host/port 仍需重启。生产者侧的 offerings 与限额用 `aweshare producer reload` 热加载。
 
-**hub 自挂模型（`hub produce`）**：`config.produce.toml` 放 `[[backends]]` 和 `[[offerings]]` 段（producer 格式；别名命名空间 `hub/…`，裸名自动补前缀），上游 key 放同目录的 `secrets.json`（chmod 600）；`config.toml` 仅保留 Hub 自身运行参数。这些 offering 在目录里挂在 producer `hub` 名下，由 hub 进程直接转发——不走隧道，也不占 `AWESHARE_MAX_PRODUCERS` 席位。限额（`maxConcurrencyPerUser`、`maxConcurrentUsers`、`dailyTokens`）、用量计量和 consumer 限额与远端 producer 完全一致。内置 producer `hub` 不是身份（无令牌、无邀请码、不可撤销）；只有在它名下确实挂着 offering 时才出现在 `hub status` 的 producers 名册里，状态显示为 `built-in`。目录与 key 改动像其他参数一样热加载；写坏了保留旧目录并记日志。
+**hub 自挂模型（`hub produce`）**：`config.produce.toml` 放 `[[backends]]` 和 `[[offerings]]` 段（producer 格式；别名命名空间 `hub/…`，裸名自动补前缀），上游 key 放同目录的 `secrets.json`（chmod 600）；`config.toml` 仅保留 Hub 自身运行参数。这些 offering 在目录里挂在 producer `hub` 名下，由 hub 进程直接转发——不走隧道，也不占 `AWESHARE_MAX_PRODUCERS` 席位。限额（`maxConcurrencyPerUser`、`maxConcurrentUsers`、`dailyTokens`）、用量计量和 consumer 限额与远端 producer 完全一致。内置 producer `hub` 不是身份（无令牌、无邀请码、不可撤销）；只有在它名下确实挂着 offering 时才出现在 `hub list producers` 名册里，状态显示为 `built-in`。文件顶部可选的 `enabled = true|false` 是整个目录的总闸：`false` 在热加载窗口内卸载全部 `hub/…` 模型（目录定义原样保留，改回 `true` 即整体恢复）——相当于远端 producer 侧吊销 invite 的 produce 对等物；非布尔值会大声报错而不是默默继续服务或卸载。目录与 key 改动像其他参数一样热加载；写坏了保留旧目录并记日志。
 
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
@@ -390,7 +389,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | 兑换入口的全局保险额度（格式合法的尝试，全体来源共享） |
 | `AWESHARE_INVITE_REDEEM_PER_IP_MIN` | 5 | 兑换入口的每来源 IP 桶（隧道/代理后取 `CF-Connecting-IP`）——单个访客无法垄断入场；两个键都支持 SIGHUP 热加载 |
 | `AWESHARE_MAX_PRODUCERS` | 10 | 活跃生产者上限——令牌签发（admin API）、邀请码兑换与 restore 满员时返回 `403 HUB_FULL` |
-| `AWESHARE_AUTO_BLOCK_MODEL_MISMATCH` | false | 连续 2 个成功响应报告的模型与声明不符后自动封禁该 offering。默认关闭：不符会被记录（翻转时打一次 warn 日志）并在 `hub status` / `consumer list` / `list usage --details` 里可见，hub 默认只报告不处置。自动封禁在 producer 改报不同的 `upstreamModel` 后解除；显式手动 `offering block` 优先且永久保留；支持 SIGHUP 热加载 |
+| `AWESHARE_AUTO_BLOCK_MODEL_MISMATCH` | false | 连续 2 个成功响应报告的模型与声明不符后自动封禁该 offering。默认关闭：不符会被记录（翻转时打一次 warn 日志）并在 `hub list offerings` / `consumer list` / `list usage --details` 里可见，hub 默认只报告不处置。自动封禁在 producer 改报不同的 `upstreamModel` 后解除；显式手动 `admin offering revoke` 优先且永久保留；支持 SIGHUP 热加载 |
 | `AWESHARE_NO_UPDATE_CHECK` | 未设置 | 设为 `1` 关闭被动更新提醒 |
 | `AWESHARE_TIMEZONE` | `Asia/Shanghai` | CLI 打印的所有给人看的时间（表格单元、`since …` 窗口、日志行）的显示时区，接受任意 IANA 名称；线上传输、SQLite 与 `--json` 仍是 UTC ISO。由实际渲染的 CLI 读取，对 `docker exec` 同样生效——改容器上的该变量即可改变 `hub list`/`hub status` 输出。非服务端参数：不走 SIGHUP 热加载，也没有 config.toml 键 |
 

@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-30
+
+### Added
+
+- **Master switch for the hub-local catalog** — `config.produce.toml` now accepts a top-level `enabled = true|false` (default `true`). `false` unloads every `hub/…` model within the 2s hot-reload window while the catalog definitions stay intact — flipping it back restores the whole catalog in one edit. This gives the produce identity the counterpart of what `admin invite revoke` already gives remote producers: one reversible, whole-identity off switch. The switch is read before anything else, so it wins even over a broken `secrets.json`; a non-boolean value (e.g. `enabled = "false"`) fails the reload loudly and keeps the previous state rather than silently serving or unloading. `hub produce init` scaffolds the key commented out.
+
+### Fixed
+
+- **Editing `config.produce.toml` (or a producer re-register) no longer reverts a same-day quota refresh** — day-scoped refresh grants (`producer refresh` / `hub produce refresh`) used to ride on the offerings rows, which every catalog hot-reload prunes and rebuilds; a config edit whose mid-write state read as a valid-but-partial catalog deleted the rows and, with them, the grant — the day's usage came back and every REMAINING column snapped to its pre-refresh value. Grants now live in their own alias-keyed `quota_grants` table (schema v15; existing markers migrate on first open): they survive prune, re-add and protocol swaps, and still lapse at Beijing midnight by computation. `--clear` drops the grant row; the refresh API's reply is unchanged.
+
+### Changed
+
+- **Hub CLI surface: one gate for writes, five tables for reads, one dashboard (breaking)** — the hub subcommands now follow one law: `list <noun>` reads a table, `status` is the live dashboard, `admin` is the operator's write gate, and unknown flags fail loudly everywhere.
+  - **`admin` group (new)** — every state-changing verb lives under `aweshare hub admin`: `invite mint` (was bare `hub invite`), `invite revoke N` / `restore N` (was `hub invite revoke/restore`, identity-level suspension — the sledgehammer), and `offering revoke ALIAS` / `restore ALIAS` (was `hub offering block/restore`, the per-alias scalpel; the API path and the 503 `OFFERING_BLOCKED` code are unchanged). Bare `admin`, `admin invite` and `admin offering` print help — nothing mutates by accident. The old command names fail loudly with a pointer to the new forms.
+  - **`list` grew to five tables** — `hub list [invites|producers|consumers|offerings|usage]`, default still `invites`. `producers`/`consumers` are the rosters and `offerings` the alias table (same columns as `consumer list`, worst status first) — all three moved out of `status`, which no longer takes `--all` or prints tables.
+  - **`status` is a slim dashboard** — capacity (producer slots, consumers, offering counts), last-5m health, admission-rejection pressure and the effective consumer defaults; no tables, no flags.
+  - **`serve` is the only runner** — bare `hub produce` no longer starts a server (it failed loudly with a pointer to `serve`); a `config.produce.toml` in the data dir mounts automatically either way, and `produce init` / `produce refresh` keep their exact semantics.
+  - **Unknown flags are rejected on every hub command** (and on `consumer`, matching `producer`, which already had this) — a typo'd flag now fails with the command's `-h` pointer instead of being silently ignored. Subcommand help resolves depth-first, so `hub admin invite mint -h` shows the invite help.
+
 ## [0.5.9] - 2026-08-29
 
 ### Added

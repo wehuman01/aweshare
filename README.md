@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.5.9-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -56,7 +56,7 @@ Consumer (standard SDK, zero changes)         Producer side
 
 - To route and meter, **consumer prompts and model responses transit the hub in plaintext — this is not end-to-end encryption**. The hub persists no request/response content, but the hub operator can technically see it. Only use a hub instance you trust — which is why the hub is open source and self-hostable.
 - Upstream API keys never leave the producer's device and are never sent to consumers. Tokens are stored twice on purpose: a **peppered SHA-256 hash** drives authentication, and the plaintext is kept so the operator can hand a lost one back (`hub list invites --token`). Invite codes work the same way — their plaintext is re-viewable with `hub list invites --reveal`. A DB leak therefore exposes every identity, so guard the data dir.
-- Token revocation is **reversible suspension** (`hub invite revoke N` / `hub invite restore N`, by invite), and an invite and the producer it minted move together: revoking a redeemed code suspends that producer (and closes its tunnel), and restoring from either handle revives both. Nothing is deleted on revoke — offerings and usage history survive a suspension.
+- Token revocation is **reversible suspension** (`hub admin invite revoke N` / `hub admin invite restore N`, by invite), and an invite and the producer it minted move together: revoking a redeemed code suspends that producer (and closes its tunnel), and restoring from either handle revives both. Nothing is deleted on revoke — offerings and usage history survive a suspension.
 
 ### Compliance and disclaimer
 
@@ -92,11 +92,7 @@ aweshare hub init        # data in ~/.aweshare-hub; prints the admin token — s
 aweshare hub serve       # listens on :8787 (put Caddy/nginx TLS in front)
 ```
 
-The hub can also host models itself — no producer machine needed. Add `[[backends]]`/`[[offerings]]` sections to `~/.aweshare-hub/config.produce.toml` (same format as a producer's config, alias namespace `hub/…`), put the upstream keys in `~/.aweshare-hub/secrets.json`, and run:
-
-```bash
-aweshare hub produce    # serve + the hub's own models; consumers dial hub/<name> like any offering
-```
+The hub can also host models itself — no producer machine needed. Scaffold with `aweshare hub produce init`, add `[[backends]]`/`[[offerings]]` sections to `~/.aweshare-hub/config.produce.toml` (same format as a producer's config, alias namespace `hub/…`), put the upstream keys in `~/.aweshare-hub/secrets.json`, and run the same `aweshare hub serve` — the catalog mounts automatically and consumers dial `hub/<name>` like any offering.
 
 **docker**:
 
@@ -110,10 +106,10 @@ Then bring people in. Producers join on their own — invite codes (`asi_…`, s
 
 ```bash
 # bound: lock the code to a specific name ("inviting that user")
-aweshare hub invite --name peng [--expires-in 7d]      # → asi_..., send to the producer
+aweshare hub admin invite mint --name peng [--expires-in 7d]      # → asi_..., send to the producer
 
 # unbound: batch hand-out; the producer submits name + email at redeem (stored on the hub)
-aweshare hub invite --count 10 [--expires-in 7d]
+aweshare hub admin invite mint --count 10 [--expires-in 7d]
 
 # the producer redeems it themselves (no token hand-off needed):
 aweshare producer join --hub https://hub.example.com --code asi_... [--name NAME --email YOU@EXAMPLE.COM]
@@ -122,7 +118,7 @@ aweshare producer join --hub https://hub.example.com --code asi_... [--name NAME
 Consumers join the same way — a consumer code redeems into an `asc_` key the consumer keeps:
 
 ```bash
-aweshare hub invite --role consumer --name alice [--expires-in 7d]   # → asi_..., send to the consumer
+aweshare hub admin invite mint --role consumer --name alice [--expires-in 7d]   # → asi_..., send to the consumer
 
 # the consumer redeems it themselves (prints the asc_ token once, with the SDK
 # env vars ready to paste — save the token, it will not be shown again):
@@ -137,13 +133,13 @@ Three token roles, one per party:
 
 | Role | Who holds it | How it's used |
 |---|---|---|
-| `admin` | hub operator (you only) | the admin REST API (`/admin/v1/*`); CLI side: `hub invite` (mint) / `invite revoke\|restore` / `list invites` / `status` |
+| `admin` | hub operator (you only) | the admin REST API (`/admin/v1/*`); CLI side: `hub admin invite mint` / `admin invite revoke\|restore` / `admin offering revoke\|restore` / `list` / `status` |
 | `producer` (`asp_...`) | the agent on the producer's machine | set as `token` in `~/.aweshare/config.toml`; the agent registers its offerings with it |
 | `consumer` (`asc_...`) | whoever calls the models | set in SDK env vars (`ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`); it identifies the consumer for metering, limits and suspension |
 
 The producer's `name` becomes their alias namespace (the `peng/` in `peng/gpt-4o`).
 
-The operator owns admission: one-time invite codes for both roles, the only admission path (every identity carries its invite handle for its whole lifecycle). A redeemed consumer key may call **every** offering on the hub — if you let someone in, they can use what is shared. Guardrails: per-consumer `hub limits` (rate, concurrency, token budgets), per-offering caps (`maxConcurrentUsers`, `dailyTokens`) and `hub invite revoke` suspension, all enforced by the hub.
+The operator owns admission: one-time invite codes for both roles, the only admission path (every identity carries its invite handle for its whole lifecycle). A redeemed consumer key may call **every** offering on the hub — if you let someone in, they can use what is shared. Guardrails: per-consumer `hub limits` (rate, concurrency, token budgets), per-offering caps (`maxConcurrentUsers`, `dailyTokens`) and `hub admin invite revoke` suspension, all enforced by the hub.
 
 #### 2. Producer first run (in this order)
 
@@ -273,7 +269,7 @@ One alias can also speak several wire protocols at once: replace `backend = "…
 
 `maxConcurrencyPerUser` caps each consumer's in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a consumer firing 5 parallel requests needs `maxConcurrencyPerUser ≥ 5` for itself alone, while the total on the alias is bounded by `maxConcurrentUsers × maxConcurrencyPerUser`. Daily caps count recorded usage (see "Honest limits" below). (Renamed in v0.4.3 from `maxConcurrency`, which capped the alias's total in-flight requests.)
 
-An exhausted daily budget can be reopened mid-day by the offering's **owner** — no restart, no re-register: `aweshare producer refresh ns/model` on the producer's machine re-anchors today's window at this moment (usage before it stops counting), `--add N` raises today's cap by N tokens until Beijing midnight, `--clear` drops both markers. For hub-hosted models the same verbs live under `aweshare hub produce refresh name` (`hub/` prefix optional). Both commands take `--all` to bare-refresh every one of their own offerings in a single run. The split is deliberate: quota expansion is the owner's call — the hub operator can restrict a producer's model (`offering block`) but never spends more of its upstream budget; markers survive re-registers and lapse at Beijing midnight on their own. A permanent raise belongs in the config (`dailyTokens`), which hot-reloads.
+An exhausted daily budget can be reopened mid-day by the offering's **owner** — no restart, no re-register: `aweshare producer refresh ns/model` on the producer's machine re-anchors today's window at this moment (usage before it stops counting), `--add N` raises today's cap by N tokens until Beijing midnight, `--clear` drops both markers. For hub-hosted models the same verbs live under `aweshare hub produce refresh name` (`hub/` prefix optional). Both commands take `--all` to bare-refresh every one of their own offerings in a single run. The split is deliberate: quota expansion is the owner's call — the hub operator can restrict a producer's model (`admin offering revoke`) but never spends more of its upstream budget; grants survive re-registers and any catalog edit (they live in their own alias-keyed table, never on the offering rows) and lapse at Beijing midnight on their own. A permanent raise belongs in the config (`dailyTokens`), which hot-reloads.
 
 Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; keep `secrets.json` at 0600 and out of git/screenshots; rotate on suspected leaks. Before sharing, check the upstream's terms: account rules, subscription limits, forwarding and commercial-use constraints.
 
@@ -333,20 +329,23 @@ Both sides at a glance — details in the sections above.
 | Command | Purpose |
 |---|---|
 | `aweshare hub init` | create data dir + admin token (printed once) |
-| `aweshare hub serve [--host H] [--port N]` | run the hub |
-| `aweshare hub produce [--host H] [--port N]` | run the hub with its own models attached — same as `serve`; the `[[backends]]`/`[[offerings]]` sections of `config.produce.toml` become `hub/…` offerings served in-process (keys in the data dir's secrets.json; edits hot-reload) |
-| `aweshare hub invite [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `list invites --reveal`); `--expires-in` also bounds the lifetime of the token it mints — an expired key fails auth with 401 `TOKEN_EXPIRED` (`none` = code and identity never expire; identities minted before this change never expire); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
-| `aweshare hub invite revoke N` · `aweshare hub invite restore N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
+| `aweshare hub serve [--host H] [--port N]` | run the hub — the only runner; a `config.produce.toml` in the data dir mounts automatically: its `[[backends]]`/`[[offerings]]` sections become `hub/…` offerings served in-process (keys in the data dir's secrets.json; edits hot-reload) |
+| `aweshare hub produce init` | scaffold `config.produce.toml` + empty `secrets.json` in the data dir (kept if they exist); also initializes the data dir, db, pepper and admin token |
+| `aweshare hub admin invite mint [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | mint one-time invite codes (`asi_…`, printed once, expire after 7 d by default; re-view with `list invites --reveal`); `--expires-in` also bounds the lifetime of the token it mints — an expired key fails auth with 401 `TOKEN_EXPIRED` (`none` = code and identity never expire; identities minted before this change never expire); producer codes: bound (`--name`) or unbound (name + email at redeem, `--count` batches); consumer codes: always bound to one name |
+| `aweshare hub admin invite revoke N` · `aweshare hub admin invite restore N` | kill an invite / undo — a redeemed code suspends the producer it minted, restore revives both |
+| `aweshare hub admin offering revoke ALIAS` · `aweshare hub admin offering restore ALIAS` | the per-alias scalpel between doing nothing and revoking a whole producer: revoke one offering (every protocol row of the alias) — new requests get 503 `OFFERING_BLOCKED`, `list offerings` shows `blocked`, the producer's other offerings keep serving. Manual revokes survive re-registers; auto revokes (model mismatch, see `autoBlockModelMismatch`) clear once the producer re-declares a different `upstreamModel` |
+| `aweshare hub list [invites\|producers\|consumers\|offerings\|usage]` | read hub state, one table per noun (default: invites) |
 | `aweshare hub list invites [--reveal] [--token] [--json]` | the invite ledger: every code, the identity it minted and its lifecycle (pending/used/suspended/revoked/expired; a redeemed code shows `expired` once its identity's expiry passes); `--reveal` re-shows the codes, `--token` the minted tokens with last seen |
-| `aweshare hub status [--all]` | the hub's live state: producer slots, offerings counted per deduplicated alias (several protocols → one verdict, the worst), a per-alias table — the same columns as `consumer list` and `producer list`, worst status first — with live occupancy (`IN USE n/max`) and today's remaining daily tokens, and a last-5m requests/ok-rate/errors line from the usage summary (hub-admission 429s are not metered); identities appear as counts — `--all` prints the full producer/consumer rosters |
+| `aweshare hub list producers [--json]` · `aweshare hub list consumers [--json]` | the rosters: name, status (active/suspended/built-in), online state (producers), last seen, created |
+| `aweshare hub list offerings [--json]` | the catalog: offerings counted per deduplicated alias (several protocols → one verdict, the worst), one row per alias — the same columns as `consumer list` and `producer list`, worst status first — with observed model, caps, live occupancy (`IN USE n/max`) and today's remaining daily tokens |
+| `aweshare hub status` | the live dashboard: capacity (producer slots, consumers, offering counts), a last-5m requests/ok-rate/errors line from the usage summary (hub-admission 429s are not metered), admission-rejection pressure (top throttled alias/consumer) and the effective consumer defaults |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
 | `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | who used how much (default): aggregate per consumer × model, a person's rows together, busiest first — requests, errors, rate, best-effort token totals, unknown-token count, mean duration; window defaults to 7d and is printed with the table · `--details`: per-request log, newest first, zero content stored, each row naming its consumer |
-| `aweshare hub offering block ALIAS` · `aweshare hub offering restore ALIAS` | the per-alias scalpel between doing nothing and revoking a whole producer: block one offering (every protocol row of the alias) — new requests get 503 `OFFERING_BLOCKED`, status shows `blocked`, the producer's other offerings keep serving. Manual blocks survive re-registers; auto blocks (model mismatch, see `autoBlockModelMismatch`) clear once the producer re-declares a different `upstreamModel` |
 | `aweshare hub produce refresh NAME [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | reopen a hub-hosted model's daily token budget mid-day (`hub/` prefix optional): bare call re-anchors today's window at this moment, `--add N` raises today's cap by N tokens until Beijing midnight, `--clear` drops both markers. Hub-hosted (`hub/…`) offerings only — a producer's models are its own to refresh. `--all` bare-refreshes every `hub/…` offering with a daily cap in one run (unlimited ones are reported and skipped; one failure does not stop the rest) |
 
-Token issuance runs through invites (both roles). `limits` and `list usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too.
+Token issuance runs through invites (both roles). `admin`, `limits` and `list usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too.
 
-`list invites`, `list usage` and `status` print aligned tables by default; append `--json` (where documented) for the raw API response.
+Every `list` table and `status` print aligned columns by default; append `--json` (where documented) for the raw API rows.
 
 **Producer** — runs on the producer's machine (the one with the backends):
 
@@ -381,7 +380,7 @@ The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Do
 
 **Hot reload:** every tunable in the table except host/port applies live on `SIGHUP` (`kill -HUP <pid>`; Docker: `docker kill -s HUP aweshare-hub`) — the new file is validated first, and a broken edit is logged while the previous values keep serving. Env vars are fixed at process start, so keys pinned by `AWESHARE_*` ignore the reloaded file (same precedence as startup); host/port need a restart. Producer-side offerings and caps reload via `aweshare producer reload`.
 
-**Hub-hosted models (`hub produce`):** `config.produce.toml` carries `[[backends]]` and `[[offerings]]` sections (producer format; alias namespace `hub/…` — bare names are auto-prefixed) with upstream keys in `secrets.json` next to it (chmod 600). `config.toml` remains exclusively for Hub runtime settings. Those offerings appear in the catalog under producer `hub` and are served by the hub process directly — no tunnel, and they never count against `AWESHARE_MAX_PRODUCERS`. Caps (`maxConcurrencyPerUser`, `maxConcurrentUsers`, `dailyTokens`), usage metering and consumer limits apply exactly as for remote producers. The built-in `hub` producer is not an identity (no token, no invite, cannot be revoked); it appears in the `hub status` producers roster — status `built-in` — only while it carries offerings. Catalog and key edits hot-reload like the tunables; a broken catalog keeps the previous one and is logged.
+**Hub-hosted models (`hub produce`):** `config.produce.toml` carries `[[backends]]` and `[[offerings]]` sections (producer format; alias namespace `hub/…` — bare names are auto-prefixed) with upstream keys in `secrets.json` next to it (chmod 600). `config.toml` remains exclusively for Hub runtime settings. Those offerings appear in the catalog under producer `hub` and are served by the hub process directly — no tunnel, and they never count against `AWESHARE_MAX_PRODUCERS`. Caps (`maxConcurrencyPerUser`, `maxConcurrentUsers`, `dailyTokens`), usage metering and consumer limits apply exactly as for remote producers. The built-in `hub` producer is not an identity (no token, no invite, cannot be revoked); it appears in the `hub list producers` roster — status `built-in` — only while it carries offerings. An `enabled = true|false` key at the top of the file is the catalog's master switch: `false` unloads every `hub/…` model within the hot-reload window (the definitions stay; flip back to bring them all back) — the produce-side counterpart of revoking a remote producer's invite. A non-boolean value fails loudly instead of silently serving or unloading. Catalog and key edits hot-reload like the tunables; a broken catalog keeps the previous one and is logged.
 
 | Env var | Default | Purpose |
 |---|---|---|
@@ -393,13 +392,13 @@ The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Do
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | redeem entry global insurance budget (valid-format attempts shared by every origin) |
 | `AWESHARE_INVITE_REDEEM_PER_IP_MIN` | 5 | redeem entry per-origin-IP bucket (`CF-Connecting-IP` behind a tunnel/proxy) — one visitor cannot monopolize admission; both keys reload via SIGHUP |
 | `AWESHARE_MAX_PRODUCERS` | 10 | max active producers — token issuance (admin API), invite redeem and restore refuse with `403 HUB_FULL` when full |
-| `AWESHARE_AUTO_BLOCK_MODEL_MISMATCH` | false | auto-block an offering after 2 consecutive successful responses report a different model than declared. Off by default: mismatches are logged once (flip) and visible in `hub status` / `consumer list` / `list usage --details` either way — the hub is report-only until the operator opts in. An auto block clears when the producer re-declares a different `upstreamModel`; an explicit manual `offering block` takes precedence and always persists; reloads via SIGHUP |
+| `AWESHARE_AUTO_BLOCK_MODEL_MISMATCH` | false | auto-block an offering after 2 consecutive successful responses report a different model than declared. Off by default: mismatches are logged once (flip) and visible in `hub list offerings` / `consumer list` / `list usage --details` either way — the hub is report-only until the operator opts in. An auto block clears when the producer re-declares a different `upstreamModel`; an explicit manual `admin offering revoke` takes precedence and always persists; reloads via SIGHUP |
 | `AWESHARE_NO_UPDATE_CHECK` | unset | set to `1` to disable the passive update reminder |
 | `AWESHARE_TIMEZONE` | `Asia/Shanghai` | display zone for every human-readable time the CLIs print (table cells, `since …` windows, log lines). Any IANA name; the wire, SQLite and `--json` stay UTC ISO. Read by whichever CLI renders, so it also applies to `docker exec` — set it on the container to change `hub list`/`hub status` output. Not a server tunable: no SIGHUP reload, no config.toml key |
 
 Health: agent heartbeats every 15s, silent 45s = dead; backends with 2 consecutive AUTH/QUOTA failures auto-degrade (alias shows `degraded`, dispatch stops), 30s probes recover. A new connection with the same producer token replaces the old one (latest-wins).
 
-Model honesty: an offering's `upstreamModel` is the producer's claim — the hub compares it with the bounded model id reported by each successful response (`model` / `message.model` / `response.model`). This is consistency evidence, not proof of the model's underlying weights: a producer or upstream router can still rewrite that metadata. The observation rides the existing usage meter, never rewrites the relayed response, and is scoped to the same alias, protocol and current declaration. It appears in the `OBSERVED MODEL` column, `list usage --details`, and `/v1/catalog` as `observedModel`, `observedAt`, `modelMatch` and the backward-compatible `modelVerified`. Comparison is token-aware: exact ids and explicit date/revision suffixes are affirmative; vendor prefixes are tolerated; adjacent variants such as `gpt-4`/`gpt-4o` and `gpt-4o`/`gpt-4o-mini` mismatch; a less-specific response is marked `?`/`insufficient`, not verified. Handling is tiered: default **report-only**, manual `hub offering block ALIAS` or whole-producer `hub invite revoke`, and opt-in auto-block after 2 consecutive mismatches. Manual blocks override automatic ones. `producer doctor` probes every distinct configured model and reports the response-named id with the same evidence boundary.
+Model honesty: an offering's `upstreamModel` is the producer's claim — the hub compares it with the bounded model id reported by each successful response (`model` / `message.model` / `response.model`). This is consistency evidence, not proof of the model's underlying weights: a producer or upstream router can still rewrite that metadata. The observation rides the existing usage meter, never rewrites the relayed response, and is scoped to the same alias, protocol and current declaration. It appears in the `OBSERVED MODEL` column, `list usage --details`, and `/v1/catalog` as `observedModel`, `observedAt`, `modelMatch` and the backward-compatible `modelVerified`. Comparison is token-aware: exact ids and explicit date/revision suffixes are affirmative; vendor prefixes are tolerated; adjacent variants such as `gpt-4`/`gpt-4o` and `gpt-4o`/`gpt-4o-mini` mismatch; a less-specific response is marked `?`/`insufficient`, not verified. Handling is tiered: default **report-only**, manual `hub admin offering revoke ALIAS` or whole-producer `hub admin invite revoke`, and opt-in auto-block after 2 consecutive mismatches. Manual blocks override automatic ones. `producer doctor` probes every distinct configured model and reports the response-named id with the same evidence boundary.
 
 Updating a npm install: `aweshare self-update` (asks before installing; `--check` only shows versions). The CLI also reminds you at most once a day when a newer npm release exists.
 

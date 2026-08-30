@@ -8,7 +8,7 @@ Unlike ordinary CLIs, aweshare's two core processes are **long-running services*
 
 - Never launch them from this agent — not `aweshare hub serve`, not `aweshare producer start` (foreground blocks the session; even `--background` starts a shared service, which is the user's call). The same applies to deploying the hub as a container (`docker run` / `docker compose up` of `ghcr.io/wehuman01/aweshare`). Give the user the commands and let them run them in their own terminal.
 - Upstream API keys live only in `~/.aweshare/secrets.json` (0600) on the producer's machine. Never print them, never echo them into logs or chat. `aweshare producer config show` redacts them.
-- Some tokens are printed exactly once (the hub admin token from `hub init`, an `asc_` consumer token from `consumer join`, invite codes from `hub invite`). Prefer having the user run those commands so the secret lands in their terminal; if you must run one, tell the user to save the value immediately.
+- Some tokens are printed exactly once (the hub admin token from `hub init`, an `asc_` consumer token from `consumer join`, invite codes from `hub admin invite mint`). Prefer having the user run those commands so the secret lands in their terminal; if you must run one, tell the user to save the value immediately.
 - Before helping share an OpenAI/Anthropic backend, state the compliance boundary: relaying a personal-subscription key (coding plans included) to third parties likely violates the upstream's terms; self-hosted open models have no such issue. When in doubt, don't share.
 
 ## Language Behavior
@@ -227,13 +227,13 @@ Remind the consumer: prompts and responses transit the hub in plaintext — only
    ```
 2. After `hub init` (wherever it ran), mint invites — you may run these:
    ```bash
-   aweshare hub invite --name peng                       # bound producer code → asi_...
-   aweshare hub invite --count 10                        # unbound batch, name+email at redeem
-   aweshare hub invite --role consumer --name alice      # bound consumer code → asi_...
+   aweshare hub admin invite mint --name peng                       # bound producer code → asi_...
+   aweshare hub admin invite mint --count 10                        # unbound batch, name+email at redeem
+   aweshare hub admin invite mint --role consumer --name alice      # bound consumer code → asi_...
    ```
    Consumers redeem codes themselves (`aweshare consumer join`); producers via `aweshare producer join`.
 3. Administering a remote hub: run admin commands on the server (`ssh` + CLI, or `docker exec aweshare-hub aweshare hub ...`), or locally with `AWESHARE_HUB_URL=https://<hub-host>` plus the admin-token file in a local data dir — otherwise they fail with "no admin token" / connection refused.
-4. Guardrails you can tune on request: per-consumer `aweshare hub limits NAME [--rps N] [--tpm N] [--max-total-tokens N] ...`, suspension `aweshare hub invite revoke N` / `restore N` (reversible, invite-keyed).
+4. Guardrails you can tune on request: per-consumer `aweshare hub limits NAME [--rps N] [--tpm N] [--max-total-tokens N] ...`, suspension `aweshare hub admin invite revoke N` / `restore N` (reversible, invite-keyed).
 5. Security notes for the operator: keep :8787 off the public internet behind TLS; a redeemed consumer key can call **every** offering on the hub; tokens/codes stored plaintext-recoverable (`hub list invites --reveal` / `--token`) means a data-dir leak exposes identities — guard it.
 
 ---
@@ -245,7 +245,8 @@ After setup:
 ```bash
 aweshare producer doctor            # full diagnosis, ordered to find the first failing link
 aweshare producer list              # registered offerings, live status, caps, occupancy, config drift
-aweshare hub status [--all]         # offering health + capacity; --all adds rosters
+aweshare hub status                  # live dashboard: capacity, 5m health, admission pressure
+aweshare hub list offerings          # the catalog table (worst status first)
 aweshare hub list usage                  # who used how much, aggregated per consumer × model
 aweshare self-update --check        # installed vs npm latest
 ```
@@ -271,7 +272,7 @@ aweshare producer list [--json]      # this producer's offerings + drift
 aweshare producer list usage [...]   # who used this producer's models
 aweshare producer status             # one-glance summary: process, config counts, health rollup
 aweshare consumer list --hub URL --token asc_...   # hub catalog view
-aweshare hub status [--all]                  # capacity + offering health; --all adds rosters
+aweshare hub status                          # capacity + 5m health + admission pressure
 aweshare hub list invites [--reveal|--token]        # invite ledger / codes / minted tokens
 aweshare hub limits NAME             # bare call views current overrides
 aweshare hub list usage [--details] [--group-by consumer|alias] [--since 7d]
@@ -286,9 +287,10 @@ aweshare producer join --hub URL --code asi_...        # redeem a producer invit
 aweshare producer config edit                          # open config.toml in $EDITOR
 aweshare producer reload                               # re-read config + re-register offerings
 aweshare hub init                                      # create data dir + admin token (printed once!)
-aweshare hub invite [--role producer|consumer] ...     # mint one-time codes (printed once)
+aweshare hub admin invite mint [--role producer|consumer] ...   # mint one-time codes (printed once)
 aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear]
-aweshare hub invite revoke N / restore N            # reversible suspension, by invite handle
+aweshare hub admin invite revoke N / restore N    # reversible suspension, by invite handle
+aweshare hub admin offering revoke ALIAS / restore ALIAS   # per-alias scalpel
 ```
 
 User-only commands (long-running, TTY-confirming, or one-time-secret-printing):
@@ -305,7 +307,7 @@ docker run / docker compose up                         # hub deployment
 
 - Never start or stop the long-running services (`hub serve`, `producer start`/`stop`, hub containers) inside the agent — deployment is the user's call. Inspect a detached producer with `producer doctor --status`.
 - Never read or print `secrets.json` values; use `producer config show` (redacted) when showing config. Never ask the user to paste an upstream API key into chat — point them at the file instead.
-- Commands that print a secret exactly once (`hub init`, `consumer join`, `hub invite`) are best run by the user; if you run one, flag the value as save-now.
+- Commands that print a secret exactly once (`hub init`, `consumer join`, `hub admin invite mint`) are best run by the user; if you run one, flag the value as save-now.
 - State the trust boundary before anyone joins a hub: consumer traffic transits the hub in plaintext; a redeemed consumer key can call every offering. State the compliance boundary before anyone shares a key: personal-subscription keys forwarded to third parties likely violate upstream terms — the producer bears the consequences.
 - Read state through the CLI (`config show`, `list`, `doctor`); do not hand-edit SQLite or pidfiles. Config TOML edits are fine — they hot-reload.
 - Offering aliases must be `namespace/name`, lowercase, namespace matching the producer token's name. One offering = one upstream model; the old `maxConcurrency` key fails validation with a rename hint (use `maxConcurrencyPerUser`).
