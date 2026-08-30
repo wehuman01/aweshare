@@ -1,6 +1,6 @@
 <div align="center">
   <img src="./logo/logo.png" alt="aweshare" width="760">
-  <h1>aweshare：开源、local-first 的 AI 能力中继</h1>
+  <h1>aweshare：开源、local-first 的 AI 能力中继 <a href="https://github.com/Webioinfo01/aweskill"><img src="https://raw.githubusercontent.com/Webioinfo01/aweskill/main/logo/aweskill-badge2.svg" alt="aweskill companion"></a></h1>
   <p><strong>分享你闲置的本地模型与 token 订阅，或使用别人分享的——实现 token 的共享经济。</strong></p>
   <p>通过自建 Hub 共享本地 Ollama/vLLM 或已授权的 OpenAI/Anthropic 后端，消费者用标准 SDK 以 <code>命名空间/别名</code> 调用。</p>
   <p><strong>上游 API Key 永不离开生产者设备。</strong></p>

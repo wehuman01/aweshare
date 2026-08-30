@@ -1,6 +1,6 @@
 <div align="center">
   <img src="./logo/logo.png" alt="aweshare" width="760">
-  <h1>aweshare: Local-first AI Capability Relay</h1>
+  <h1>aweshare: Local-first AI Capability Relay <a href="https://github.com/Webioinfo01/aweskill"><img src="https://raw.githubusercontent.com/Webioinfo01/aweskill/main/logo/aweskill-badge2.svg" alt="aweskill companion"></a></h1>
   <p><strong>An open-source, local-first AI capability relay: share your idle local models and token subscriptions, or use what others share — a sharing economy for tokens.</strong></p>
   <p>Share local Ollama/vLLM or authorized OpenAI/Anthropic backends through a self-hosted hub, consumed with standard SDKs via <code>namespace/alias</code>.</p>
   <p><strong>Upstream API keys never leave the producer's device.</strong></p>
