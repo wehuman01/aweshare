@@ -207,6 +207,10 @@ After config edits on a running producer, `aweshare producer reload` applies the
    aweshare consumer list --hub https://hub.example.com --token asc_...
    ```
    Every producer, alias, protocol, status, caps, live occupancy and remaining daily tokens.
+4. Ping offerings end-to-end (real model calls, consume quota — scope with `--alias`):
+   ```bash
+   aweshare consumer ping --hub https://hub.example.com --token asc_...
+   ```
 4. A first smoke-test request (`curl ... /v1/chat/completions` with `"ping"`) is a real model call — only run it when the user asks.
 
 Remind the consumer: prompts and responses transit the hub in plaintext — only use a hub they trust. If Claude Code ignores env config, a stale OAuth login is overriding it — switch with `/login`.
@@ -272,6 +276,7 @@ aweshare producer list [--json]      # this producer's offerings + drift
 aweshare producer list usage [...]   # who used this producer's models
 aweshare producer status             # one-glance summary: process, config counts, health rollup
 aweshare consumer list --hub URL --token asc_...   # hub catalog view
+aweshare consumer ping --hub URL --token asc_... [--alias a,b]  # ping offerings (real calls)
 aweshare hub status                          # capacity + 5m health + admission pressure
 aweshare hub list invites [--reveal|--token]        # invite ledger / codes / minted tokens
 aweshare hub limits NAME             # bare call views current overrides

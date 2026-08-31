@@ -35,6 +35,7 @@ Ask the hub, not this page — it changes:
 ```bash
 npm install -g aweshare            # Node ≥ 22
 aweshare consumer list --hub https://aweshare.wehuman.top --token asc_...   # after you have a token
+aweshare consumer ping --hub https://aweshare.wehuman.top --token asc_... --alias producer/model   # real call: is it usable end to end?
 ```
 
 ## Producer quick start
@@ -169,6 +170,8 @@ Per-offering guardrails are set by the producer (`maxConcurrencyPerUser` — con
 **I lost my consumer token.** It cannot be recovered from the hub (only a hash is stored) — ask the operator to mint a fresh invite.
 
 **A model answers 503.** Its producer is offline. Nothing you can do but wait — check STATUS in `consumer list`.
+
+**Which offerings actually work right now?** `consumer list` shows the hub's view; `aweshare consumer ping --hub … --token asc_… [--alias name]` answers it end to end with one minimal real request per offering — status, latency and the served model. Real calls consume quota, so scope with `--alias`.
 
 **My Claude Code only speaks Anthropic and the alias is `openai`.** Correct — the hub does not translate protocols. Use an endpoint matching the alias's protocol column, or a local translation proxy if your tool has no such setting.
 

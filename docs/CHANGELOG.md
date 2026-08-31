@@ -30,6 +30,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 - **The person grouping behind the busiest-first summary order was fragile** — the "busiest person first" window function read bare `u.prompt_tokens`/`u.completion_tokens` columns, which in an aggregate query sample one arbitrary event per group; which event got sampled depended on the query plan, so the person ranking could silently flip (the same bare-column trap an earlier 0.5.x fix spelled out for the row-level sums). The window now runs over the grouped rows' own `tokens` totals, making the person grouping deterministic — and reachable as `--sort tokens`.
 
+### Added
+
+- **`aweshare consumer ping`** — end-to-end ping of the offerings a consumer can actually call: one minimal real model request per online offering row, through the same `/v1` endpoints an SDK would hit, reporting HTTP status, round-trip latency and the self-reported model per alias/protocol. A green row proves the whole chain (consumer auth, hub dispatch, tunnel, producer, upstream); a FAIL passes the hub/upstream error through verbatim (quota, auth, upstream down). Stream-only responses upstreams (e.g. chatgpt's Codex backend, "Stream must be set to true") are retried once in the shape they accept and flagged instead of misreported as broken. `--alias` scopes the run (comma-separated, bare or `producer/name` form); offline rows are skipped; requests run sequentially so the hub's per-consumer rate limits are never tripped by the diagnostic itself. Exit code 1 when any row fails, so it scripts cleanly alongside `producer doctor`.
+
 ## [0.6.0] - 2026-08-30
 
 ### Added

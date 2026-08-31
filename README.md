@@ -369,6 +369,7 @@ Every `list` table and `status` print aligned columns by default; append `--json
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it; the operator can re-view it with `hub list invites --token`) |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | discovery view of the hub: online offerings by default (degraded stay listed; `--all` includes offline) — every producer, alias, protocol, status, the per-offering caps, live occupancy (`IN USE n/max` — distinct consumers with a request in flight right now; an alias at `max/max` admits no new consumer until one settles) and remaining daily tokens |
+| `aweshare consumer ping --hub URL --token asc_… [--alias a,b]` | end-to-end check: one minimal real model request per online offering row (SDK-shaped, `max_tokens:1`) reporting status, round-trip latency and the served model per alias/protocol — a FAIL passes the hub/upstream error through verbatim. Real calls consume quota, so scope with `--alias`; exit 1 on any failure |
 
 CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
 

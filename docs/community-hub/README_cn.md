@@ -35,6 +35,7 @@ aweshare 是中继软件：它无法、也不判断你是否有权共享某个�
 ```bash
 npm install -g aweshare            # Node ≥ 22
 aweshare consumer list --hub https://aweshare.wehuman.top --token asc_...   # 拿到 token 后
+aweshare consumer ping --hub https://aweshare.wehuman.top --token asc_... --alias producer/model   # 真实调用：端到端到底能不能用?
 ```
 
 ## 生产者快速开始
@@ -169,6 +170,8 @@ curl https://aweshare.wehuman.top/v1/chat/completions \
 **消费者 token 丢了。** 无法从 hub 找回（只存哈希）——找运维者重新发一个邀请码。
 
 **某个模型返回 503。** 它的生产者掉线了。只能等——看 `consumer list` 里的 STATUS。
+
+**现在哪些模型真的能用？** `consumer list` 是 hub 视角；`aweshare consumer ping --hub … --token asc_… [--alias 名字]` 用每个 offering 一次最小真实请求端到端回答这个问题——状态、延迟、上游自报模型。真实调用消耗配额，用 `--alias` 缩小范围。
 
 **我的 Claude Code 只会说 Anthropic 方言，别名却是 `openai`。** 正常——hub 不做协议翻译。按别名的 protocol 列选对应端点；工具实在不支持切换的话，本地加一层翻译代理。
 

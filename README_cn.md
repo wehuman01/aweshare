@@ -366,6 +366,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list invites --token` 找回） |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
+| `aweshare consumer ping --hub URL --token asc_… [--alias a,b]` | 端到端检测：对每个在线 offering 行发一次最小真实模型请求（SDK 同构，`max_tokens:1`），按别名/协议报告状态、往返延迟与上游自报模型——FAIL 会原样透传 hub/上游错误。真实调用消耗配额，用 `--alias` 缩小范围；任一失败退出码为 1 |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 

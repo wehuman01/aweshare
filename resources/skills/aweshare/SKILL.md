@@ -212,7 +212,7 @@ aweshare producer doctor --status  # background instance state + recent log only
 
 ### Consumer Setup
 
-Redeeming an invite: `aweshare consumer join --hub https://<hub-host> --code asi_...` prints the `asc_` token once with these exact exports — tell the consumer to save it, it will not be shown again. Discovery: `aweshare consumer list --hub https://<hub-host> --token asc_...` shows every producer, alias, protocol, status and the per-offering caps with remaining daily tokens (`GET /v1/catalog` under the hood). After that, consumers point a standard SDK at the hub — no special client:
+Redeeming an invite: `aweshare consumer join --hub https://<hub-host> --code asi_...` prints the `asc_` token once with these exact exports — tell the consumer to save it, it will not be shown again. Discovery: `aweshare consumer list --hub https://<hub-host> --token asc_...` shows every producer, alias, protocol, status and the per-offering caps with remaining daily tokens (`GET /v1/catalog` under the hood). Ping: `aweshare consumer ping --hub https://<hub-host> --token asc_...` sends one minimal real request per online offering and reports status, latency and the served model (`--alias` scopes it; real calls, consume quota). After that, consumers point a standard SDK at the hub — no special client:
 
 ```bash
 # Anthropic SDK / Claude Code
