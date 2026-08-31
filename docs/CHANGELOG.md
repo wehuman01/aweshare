@@ -3,6 +3,19 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.6.2] - 2026-08-31
+
+### Added
+
+- **Handshake timeout on the agent tunnel** — a 20s `handshakeTimeout` is now passed to the WebSocket constructor. A network that swallows the TCP/TLS/upgrade exchange (sleep-wake, Wi-Fi switch, dead peer) no longer leaves the socket in `CONNECTING` forever: the timeout errors the dial and the reconnect loop retries instead of parking for the life of the process.
+- **Pong-based liveness detection** — the hub auto-pongs our pings, so an `OPEN` socket whose pong has been silent past 45s is assumed dead and terminated. The reconnect loop then dials a fresh tunnel instead of waiting minutes for TCP retransmit to give up. Pings go out at `pongTimeoutMs / 3`, so the deadline is only judged against pings we actually sent.
+- **Tests for both regressions** — a TCP black hole that accepts but never speaks HTTP/101, and a hub whose control frames flow but whose pongs go silent, are now covered by integration tests using real WebSocket servers.
+
+### Changed
+
+- **`applyConfig` cuts non-OPEN sockets before redialing** — previously, reloading the config while the socket was still connecting, closing, or half-open silently did nothing and a stuck connection stayed stuck until a process restart. The socket is now terminated so the reconnect loop dials a fresh tunnel with the new config.
+- **`stop()` gives the peer a 2s graceful-close window** — in-flight requests can finish cleanly instead of being aborted by a hard terminate. A timer (`unref`'d so it never holds the event loop open) cuts the socket after the grace period when the peer ignores the close frame.
+
 ## [0.6.1] - 2026-08-31
 
 ### Added
