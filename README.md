@@ -318,7 +318,7 @@ Honest limits: token-based caps count what upstreams report — Ollama streams r
 
 Error semantics: `401` invalid key · `401 TOKEN_REVOKED` suspended token (ask the operator to restore it) · `403 HUB_FULL` producer capacity reached · `404` unknown alias · `400 PROTOCOL_MISMATCH` protocol/alias mismatch · `429` rate limit, TPM or producer concurrency cap (`PRODUCER_MAX_USERS` = distinct-consumer cap; `QUOTA_EXCEEDED` = lifetime or daily token budget hit) · `502` upstream/tunnel failure (upstream 4xx/5xx passes through verbatim) · `503` producer offline / backend degraded · `504` timeout. Errors carry `{error:{code,message,requestId}}`; the requestId spans both sides' logs.
 
-Usage metering: one row per request (alias, declared upstream model, response-reported model when available, status, duration, byte counts, best-effort token counts), **zero content stored**. `aweshare hub list usage` (and `aweshare producer list usage` on a producer's machine, scoped to its own models) answers "who used how much" by default: server-side aggregation on the hub's SQLite, one row per consumer × model — a person's rows stay together, busiest person and busiest model first — with request/error counts, best-effort token totals, an explicit unknown-token count (streaming backends that report no counts) and mean duration. The window defaults to 7 days and is printed with the table (`--since 30m\|12h\|7d\|…\|all`); `--group-by consumer` rolls up to per-person totals, `--group-by alias` to per-model totals. `--details` switches to the per-request log (`GET /admin/v1/usage`; admin sees everything, producers and consumers their own slice, rows carry the consumer/producer names).
+Usage metering: one row per request (alias, declared upstream model, response-reported model when available, status, duration, byte counts, best-effort token counts), **zero content stored**. `aweshare hub list usage` (and `aweshare producer list usage` on a producer's machine, scoped to its own models) answers "who used how much" by default: server-side aggregation on the hub's SQLite, one row per consumer × model, **most recently used first** — with request/error counts, best-effort token totals, an explicit unknown-token count (streaming backends that report no counts) and mean duration. The window defaults to 7 days and is printed with the table (`--since 30m\|12h\|7d\|…\|all`); `--group-by consumer` rolls up to per-person totals, `--group-by alias` to per-model totals; `--sort` re-orders the rows (`consumer`, `producer` or `model`, alphabetical with newest first within; `tokens` or `requests`, busiest first — tokens keeps a person's rows together, the pre-0.6.1 default order). `--details` switches to the per-request log (`GET /admin/v1/usage`; admin sees everything, producers and consumers their own slice, rows carry the consumer/producer names).
 
 ## Command reference
 
@@ -340,7 +340,7 @@ Both sides at a glance — details in the sections above.
 | `aweshare hub list offerings [--json]` | the catalog: offerings counted per deduplicated alias (several protocols → one verdict, the worst), one row per alias — the same columns as `consumer list` and `producer list`, worst status first — with observed model, caps, live occupancy (`IN USE n/max`) and today's remaining daily tokens |
 | `aweshare hub status` | the live dashboard: capacity (producer slots, consumers, offering counts), a last-5m requests/ok-rate/errors line from the usage summary (hub-admission 429s are not metered), admission-rejection pressure (top throttled alias/consumer) and the effective consumer defaults |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | show, merge or clear one consumer's limit overrides (unset keys keep the hub-wide defaults) |
-| `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | who used how much (default): aggregate per consumer × model, a person's rows together, busiest first — requests, errors, rate, best-effort token totals, unknown-token count, mean duration; window defaults to 7d and is printed with the table · `--details`: per-request log, newest first, zero content stored, each row naming its consumer |
+| `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|producer\|model\|tokens\|requests] [--limit N] [--json]` | who used how much (default): aggregate per consumer × model, most recently used first — requests, errors, rate, best-effort token totals, unknown-token count, mean duration; window defaults to 7d and is printed with the table; `--sort` re-orders (consumer/producer/model alphabetical, tokens/requests busiest first) · `--details`: per-request log, newest first, zero content stored, each row naming its consumer |
 | `aweshare hub produce refresh NAME [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | reopen a hub-hosted model's daily token budget mid-day (`hub/` prefix optional): bare call re-anchors today's window at this moment, `--add N` raises today's cap by N tokens until Beijing midnight, `--clear` drops both markers. Hub-hosted (`hub/…`) offerings only — a producer's models are its own to refresh. `--all` bare-refreshes every `hub/…` offering with a daily cap in one run (unlimited ones are reported and skipped; one failure does not stop the rest) |
 
 Token issuance runs through invites (both roles). `admin`, `limits` and `list usage` are thin wrappers over the admin REST API (`/admin/v1/*`, see Endpoints and errors) — curl works too.
@@ -356,7 +356,7 @@ Every `list` table and `status` print aligned columns by default; append `--json
 | `aweshare producer config path` · `config show` · `config edit` | locate / inspect (secrets redacted) / edit the config |
 | `aweshare producer doctor [--status]` | diagnose end to end: background instance, config, backend probes, hub (including how many of your offerings are registered), recent log (`--status` skips the network probes for an instant answer) |
 | `aweshare producer list [offerings] [--json] [--all]` | what this producer has registered on the hub — alias, protocol, live status, caps, live occupancy (`IN USE`, distinct consumers in flight right now), today's token use — plus the local background instance state and drift against config.toml (hubUrl/token come from config.toml); `--all`: every producer's registrations, the discovery view |
-| `aweshare producer list usage [--details] [--consumer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | who used this producer's models (the producer token scopes the hub's metering to its own slice): aggregate per consumer × model by default — a person's rows together, busiest first, window defaults to 7d · `--details`: per-request log, newest first, each row naming its consumer |
+| `aweshare producer list usage [--details] [--consumer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|model\|tokens\|requests] [--limit N] [--json]` | who used this producer's models (the producer token scopes the hub's metering to its own slice): aggregate per consumer × model by default, most recently used first (`--sort` re-orders), window defaults to 7d · `--details`: per-request log, newest first, each row naming its consumer |
 | `aweshare producer status` | the live one-glance summary: local process, config counts, registered-offering health rollup and drift — the full table is `list offerings` |
 | `aweshare producer start [--background]` | connect and relay (long-running; `--background` detaches it — logs to `~/.aweshare/producer.log`, pid to `producer.pid`) |
 | `aweshare producer reload` | signal the background producer (SIGHUP) to re-read `config.toml` + `secrets.json` and re-register its offerings on the open tunnel — no disconnect; a broken config keeps the previous values |
@@ -393,6 +393,7 @@ The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Do
 | `AWESHARE_INVITE_REDEEM_PER_IP_MIN` | 5 | redeem entry per-origin-IP bucket (`CF-Connecting-IP` behind a tunnel/proxy) — one visitor cannot monopolize admission; both keys reload via SIGHUP |
 | `AWESHARE_MAX_PRODUCERS` | 10 | max active producers — token issuance (admin API), invite redeem and restore refuse with `403 HUB_FULL` when full |
 | `AWESHARE_AUTO_BLOCK_MODEL_MISMATCH` | false | auto-block an offering after 2 consecutive successful responses report a different model than declared. Off by default: mismatches are logged once (flip) and visible in `hub list offerings` / `consumer list` / `list usage --details` either way — the hub is report-only until the operator opts in. An auto block clears when the producer re-declares a different `upstreamModel`; an explicit manual `admin offering revoke` takes precedence and always persists; reloads via SIGHUP |
+| `AWESHARE_HUB_CONTACT_EMAIL` | unset | contact address shown on the browser landing page (`GET /` with `Accept: text/html`) where visitors request an invite — a static bilingual EN/中文 page (toggle via `?lang=`, first visit follows `Accept-Language`); unset shows generic "contact the hub operator" wording; reloads via SIGHUP |
 | `AWESHARE_NO_UPDATE_CHECK` | unset | set to `1` to disable the passive update reminder |
 | `AWESHARE_TIMEZONE` | `Asia/Shanghai` | display zone for every human-readable time the CLIs print (table cells, `since …` windows, log lines). Any IANA name; the wire, SQLite and `--json` stay UTC ISO. Read by whichever CLI renders, so it also applies to `docker exec` — set it on the container to change `hub list`/`hub status` output. Not a server tunable: no SIGHUP reload, no config.toml key |
 
@@ -449,3 +450,26 @@ If aweshare saves you a subscription or a GPU box, consider supporting it:
 
 Licensed under the aweshare Proprietary License — free to use and self-host,
 no redistribution. See [LICENSE](./LICENSE).
+
+## Awesome Ecosystem
+
+aweshare is part of a growing family of "awesome" tools — CLI-first, local-first, and operable by AI agents.
+
+### CLI Tools
+
+- **[aweskill](https://aweskill.webioinfo.top/)** — CLI-first skill package manager supporting 47+ AI coding agents.
+- **[aweswitch](https://github.com/Webioinfo01/aweswitch)** — Agent profile switcher for Claude Code, Codex, and OpenCode.
+- **[awerouter](https://github.com/mugpeng/awerouter)** — Smart router that splits requests between Flash and Pro models using structural signals, cutting unnecessary model spend.
+- **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — Bookmark, categorize, and restore AI coding sessions; pairs with aweswitch to save profiles and launch with one command.
+- **[aweshare](https://github.com/wehuman01/aweshare)** — Share local Ollama/vLLM backends, domestic coding plans, or authorized OpenAI/Anthropic subscriptions through a self-hosted hub — a sharing economy for tokens.
+- **[awewarm](https://github.com/wehuman01/awewarm)** — Subscription window warmer that keeps AI coding-plan windows active, for local setups and through a remote hub server.
+- **[awescholar](https://github.com/Webioinfo01/awescholar)** — AI-agent-operable scientific literature discovery and curation.
+
+### Desktop Apps
+
+- **[awedot](https://awedot.wehuman.top/)** — A floating orb at your screen edge keeps track of the current AI session: bookmark it in one click, resume anytime, and pair with aweswitch to pin the agent's config (e.g., relaunch with the GLM model).
+
+### Project Collections
+
+- **[Awesome AI Meets Biology](https://github.com/Webioinfo01/Awesome-AI-Meets-Biology)** — A curated survey of AI applications in biology, bioinformatics, and biomedical research. Powered by awescholar.
+- **[Awesome AI Virtual Tumor](https://github.com/Webioinfo01/Awesome-AI-Virtual-Tumor)** — A curated collection of state-of-the-art AI systems for virtual tumor modeling and simulation: static models, dynamic models, agents, benchmarks, and reviews.

@@ -315,7 +315,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 
 错误语义：`401` 无效密钥 · `401 TOKEN_REVOKED` 令牌被挂起（请联系运维者 restore） · `403 HUB_FULL` 生产者容量已满 · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`PRODUCER_MAX_USERS` = 不同消费者数上限；`QUOTA_EXCEEDED` = 终身或每日 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
 
-用量记录：每请求一行（别名、声明的上游模型、可用时的响应自报模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。`aweshare hub list usage`（生产者机器上则是 `aweshare producer list usage`，自动限定在自己模型那份）默认就回答"谁用了多少"：聚合在 hub 的 SQLite 上完成，按 消费者 × 模型 一行——同一个人的行聚在一起，最忙的人和最忙的模型排前面——给出请求数、错误数、尽力提取的 token 总量、未知 token 行数（不回报用量的流式后端）与平均耗时。窗口默认 7 天并随表头打印（`--since 30m\|12h\|7d\|…\|all`）；`--group-by consumer` 收粗到每人一行，`--group-by alias` 收粗到每模型一行。`--details` 切到逐请求日志（`GET /admin/v1/usage`；admin 全量，生产者/消费者各看自己那份，行内带消费者/生产者名字）。
+用量记录：每请求一行（别名、声明的上游模型、可用时的响应自报模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。`aweshare hub list usage`（生产者机器上则是 `aweshare producer list usage`，自动限定在自己模型那份）默认就回答"谁用了多少"：聚合在 hub 的 SQLite 上完成，按 消费者 × 模型 一行，**最近使用的排在最上面**——给出请求数、错误数、尽力提取的 token 总量、未知 token 行数（不回报用量的流式后端）与平均耗时。窗口默认 7 天并随表头打印（`--since 30m\|12h\|7d\|…\|all`）；`--group-by consumer` 收粗到每人一行，`--group-by alias` 收粗到每模型一行；`--sort` 换排序（`consumer`/`producer`/`model` 按该列字母序、同列内新在前；`tokens`/`requests` 最忙在前——tokens 仍把同一个人的行聚在一起，即 0.6.1 之前的默认排序）。`--details` 切到逐请求日志（`GET /admin/v1/usage`；admin 全量，生产者/消费者各看自己那份，行内带消费者/生产者名字）。
 
 ## 常用命令
 
@@ -337,7 +337,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub list offerings [--json]` | 目录：按去重 alias 计数的模型健康（一个别名多协议只算一个、取最差状态），一个别名一行——列与 `consumer list`/`producer list` 完全一致、问题状态在前——含自报模型、限额、实时占用（`IN USE n/max`）与当日剩余 token |
 | `aweshare hub status` | 实时仪表盘：容量（producer 席位、consumer 数、offering 计数）、来自用量汇总的最近 5 分钟请求/成功率/错误行（hub 准入类 429 不计量）、准入拒绝压力（被限流最狠的 alias/消费者）与生效的消费者默认限额 |
 | `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
-| `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，同一个人的行聚在一起，最忙在前——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印 · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
+| `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|producer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，最近使用的在最上面——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印；`--sort` 换排序（consumer/producer/model 字母序，tokens/requests 最忙在前） · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
 | `aweshare hub produce refresh NAME [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | 当日中途重开某个 hub 自有模型的 token 额度（`hub/` 前缀可省）：裸调用把今日窗口重新起算，`--add N` 把今日上限提高 N 个 token 直到北京时间午夜，`--clear` 清掉两个标记。仅限 hub 自有（`hub/…`）模型——producer 的模型归它自己刷新。`--all` 一条命令裸刷新全部有日限额的 `hub/…` 模型（无限额的会提示跳过；单个失败不中断其余） |
 
 令牌签发统一走邀请码（两种角色）。`admin`、`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。
@@ -353,7 +353,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare producer config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
 | `aweshare producer doctor [--status]` | 端到端诊断：后台实例、配置、后端探测、hub（含你的 offerings 有多少已注册）、最近日志（`--status` 跳过网络探测，秒回） |
 | `aweshare producer list [offerings] [--json] [--all]` | 查看本 producer 在 hub 上注册了什么——别名、协议、实时状态、限额、即时占用（`IN USE`，此刻在用的不同消费者数）、当日 token 用量——外加本地后台实例状态与和 config.toml 的漂移（hubUrl/token 取自 config.toml）；`--all`：全部 producer 的注册情况（发现视图） |
-| `aweshare producer list usage [--details] [--consumer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--limit N] [--json]` | 谁用了本 producer 的模型（producer 令牌把 hub 计量限定在自己那份）：默认按 消费者 × 模型 聚合——同一个人的行聚在一起，最忙在前，窗口默认 7d · `--details`：逐请求日志，新在前，每行标明消费者 |
+| `aweshare producer list usage [--details] [--consumer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了本 producer 的模型（producer 令牌把 hub 计量限定在自己那份）：默认按 消费者 × 模型 聚合，最近使用的在最上面（`--sort` 换排序），窗口默认 7d · `--details`：逐请求日志，新在前，每行标明消费者 |
 | `aweshare producer status` | 一眼摘要：本地进程、配置计数、已注册模型健康汇总与漂移——完整表格看 `list offerings` |
 | `aweshare producer start [--background]` | 连接并转发（长驻进程；`--background` 转入后台——日志写 `~/.aweshare/producer.log`，pid 写 `producer.pid`） |
 | `aweshare producer reload` | 通知后台 producer（SIGHUP）重读 `config.toml` + `secrets.json`，并在既有隧道上重新注册 offerings——不断连；配置有误时保留旧值继续服务 |
@@ -390,6 +390,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 | `AWESHARE_INVITE_REDEEM_PER_IP_MIN` | 5 | 兑换入口的每来源 IP 桶（隧道/代理后取 `CF-Connecting-IP`）——单个访客无法垄断入场；两个键都支持 SIGHUP 热加载 |
 | `AWESHARE_MAX_PRODUCERS` | 10 | 活跃生产者上限——令牌签发（admin API）、邀请码兑换与 restore 满员时返回 `403 HUB_FULL` |
 | `AWESHARE_AUTO_BLOCK_MODEL_MISMATCH` | false | 连续 2 个成功响应报告的模型与声明不符后自动封禁该 offering。默认关闭：不符会被记录（翻转时打一次 warn 日志）并在 `hub list offerings` / `consumer list` / `list usage --details` 里可见，hub 默认只报告不处置。自动封禁在 producer 改报不同的 `upstreamModel` 后解除；显式手动 `admin offering revoke` 优先且永久保留；支持 SIGHUP 热加载 |
+| `AWESHARE_HUB_CONTACT_EMAIL` | 未设置 | 浏览器落地页（带 `Accept: text/html` 访问 `GET /`）上展示的申请邀请联系邮箱——页面为中英双语静态页（`?lang=` 切换，首次访问跟随 `Accept-Language`）；未设置时显示通用的"联系 hub 管理员"文案；支持 SIGHUP 热加载 |
 | `AWESHARE_NO_UPDATE_CHECK` | 未设置 | 设为 `1` 关闭被动更新提醒 |
 | `AWESHARE_TIMEZONE` | `Asia/Shanghai` | CLI 打印的所有给人看的时间（表格单元、`since …` 窗口、日志行）的显示时区，接受任意 IANA 名称；线上传输、SQLite 与 `--json` 仍是 UTC ISO。由实际渲染的 CLI 读取，对 `docker exec` 同样生效——改容器上的该变量即可改变 `hub list`/`hub status` 输出。非服务端参数：不走 SIGHUP 热加载，也没有 config.toml 键 |
 
@@ -445,3 +446,26 @@ aweshare producer doctor
 > aweshare 可免费使用与自托管。赞助让它得以持续维护——谢谢。
 
 依据 aweshare 专有许可发布——可自由使用与自托管，禁止再分发。详见 [LICENSE](./LICENSE)。
+
+## Awesome 软件生态
+
+aweshare 是一个不断壮大的 "awesome" 工具家族中的一员 — 围绕 AI 编程 agent 打造，local-first、可被 agent 直接操作。
+
+### CLI 工具
+
+- **[aweskill](https://aweskill.webioinfo.top/)** — CLI 优先的技能包管理器，支持 47+ AI 编程 agent。
+- **[aweswitch](https://github.com/Webioinfo01/aweswitch)** — Claude Code、Codex、OpenCode 的 agent 配置切换器。
+- **[awerouter](https://github.com/mugpeng/awerouter)** — 智能路由器，用结构信号把请求分给 Flash 或 Pro 模型，减少不必要的模型开销。
+- **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — 收藏、分类、恢复 AI 编程会话，还能搭配 aweswitch 实现保存配置，一键启动。
+- **[aweshare](https://github.com/wehuman01/aweshare)** — 通过自建 Hub 共享本地 Ollama/vLLM，或国产厂商 coding plan，或已授权的 OpenAI/Anthropic 帐号订阅，实现 token 的共享经济。
+- **[awewarm](https://github.com/wehuman01/awewarm)** — 订阅窗口保持器，让 AI 编程套餐的窗口持续激活，无论是本地设置，还是通过远程连接的服务器。
+- **[awescholar](https://github.com/Webioinfo01/awescholar)** — AI agent 可自主执行的科学文献发现与策展，搜索、标注、筛选和报告学术论文。
+
+### 桌面应用
+
+- **[awedot](https://awedot.wehuman.top/)** — 悬浮球驻留屏幕边缘，实时追踪当前 AI 会话；一键收藏、随时恢复，并可搭配 aweswitch 固定 agent 配置（比如用 GLM 模型启动）。
+
+### Project Collections
+
+- **[Awesome AI Meets Biology](https://github.com/Webioinfo01/Awesome-AI-Meets-Biology)** — AI 在生物学、生物信息学和生物医学研究中应用的精选综述。由 awescholar 驱动。
+- **[Awesome AI Virtual Tumor](https://github.com/Webioinfo01/Awesome-AI-Virtual-Tumor)** — 面向虚拟肿瘤建模与仿真的前沿 AI 系统精选合集：静态模型、动态模型、agent、基准与综述。

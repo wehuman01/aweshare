@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Bilingual landing page on `GET /` for browsers** — the hub root used to answer every visitor with a bare JSON 404; to someone holding an invite code that reads as "site broken". A request whose `Accept` includes `text/html` now gets a static landing page (no JavaScript, no external requests) explaining what the hub is and how to connect: ask for an invite, `aweshare consumer join`, point the SDK at the visited host. Every other client keeps the exact JSON 404 it always got. The page exists in two fully monolingual versions, English and Chinese, switched by the `EN / 中文` toggle (`?lang=zh|en`); the first visit follows the browser's primary `Accept-Language` tag. The operator's invite-request address is configurable — `contactEmail` in the hub's `config.toml` or `AWESHARE_HUB_CONTACT_EMAIL` — shown as a mailto link when set, generic "contact the hub operator" wording when not; it hot-reloads like the other tunables. The join commands on the page interpolate the request's `Host` header (both it and the email are HTML-escaped — reflected input never becomes markup), so visitors always see the address that brought them there.
+
+### Changed
+
+- **Usage summaries now default to most-recently-used first, with `--sort` to choose the order** — `aweshare hub list usage` and `aweshare producer list usage` (summary view) used to sort "busiest first": a person's token total, then each model's tokens. The default is now time — the group touched most recently sits on top, matching the `--details` log's newest-first reading direction. `--sort KEY` picks the order explicitly: `time` (default), `consumer`, `producer` or `model` (that column alphabetical, newest first within it — meaningless combos like `--sort consumer --group-by alias` fail loudly), or `tokens` / `requests` (busiest first; `tokens` keeps a person's rows together and reproduces the old default order). The header line now names the active sort. `GET /admin/v1/usage/summary` takes the same `sort` parameter (400 `INVALID_SORT` on a bad value); summary rows gained two additive fields, `tokens` (prompt + completion total) and `last_id` (the group's latest event id, the order tiebreak). `--sort` is rejected on `--details` — a request log is a timeline. On the producer CLI `--sort producer` is rejected too (every row is already the caller's own).
+
+### Fixed
+
+- **The person grouping behind the busiest-first summary order was fragile** — the "busiest person first" window function read bare `u.prompt_tokens`/`u.completion_tokens` columns, which in an aggregate query sample one arbitrary event per group; which event got sampled depended on the query plan, so the person ranking could silently flip (the same bare-column trap an earlier 0.5.x fix spelled out for the row-level sums). The window now runs over the grouped rows' own `tokens` totals, making the person grouping deterministic — and reachable as `--sort tokens`.
+
 ## [0.6.0] - 2026-08-30
 
 ### Added
