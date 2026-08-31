@@ -35,7 +35,7 @@ Ask the hub, not this page — it changes:
 ```bash
 npm install -g aweshare            # Node ≥ 22
 aweshare consumer list --hub https://aweshare.wehuman.top --token asc_...   # after you have a token
-aweshare consumer ping --hub https://aweshare.wehuman.top --token asc_... --alias producer/model   # real call: is it usable end to end?
+aweshare consumer list --hub https://aweshare.wehuman.top --token asc_... --ping --alias producer/model   # real call: is it usable end to end?
 ```
 
 ## Producer quick start
@@ -171,7 +171,7 @@ Per-offering guardrails are set by the producer (`maxConcurrencyPerUser` — con
 
 **A model answers 503.** Its producer is offline. Nothing you can do but wait — check STATUS in `consumer list`.
 
-**Which offerings actually work right now?** `consumer list` shows the hub's view; `aweshare consumer ping --hub … --token asc_… [--alias name]` answers it end to end with one minimal real request per offering — status, latency and the served model. Real calls consume quota, so scope with `--alias`.
+**Which offerings actually work right now?** `consumer list` already answers most of it for free: LAST SEEN is the hub's own freshness evidence (how long ago real traffic or a recovery probe last proved an offering served). `aweshare consumer list --hub … --token asc_… --ping [--alias name]` adds your own proof: one minimal real request per offering through the same path your SDK uses — status, latency and the served model. Real calls consume quota, so scope with `--alias`; the hub budgets probe-shaped requests (15/day per consumer by default), so a budgeted-out run answers 429 PROBE_BUDGET_EXCEEDED.
 
 **My Claude Code only speaks Anthropic and the alias is `openai`.** Correct — the hub does not translate protocols. Use an endpoint matching the alias's protocol column, or a local translation proxy if your tool has no such setting.
 

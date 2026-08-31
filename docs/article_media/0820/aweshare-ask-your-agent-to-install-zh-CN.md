@@ -139,7 +139,7 @@ doctor 探测后台实例、配置、后端和 hub 连接——全绿，`4/4 off
 
 **Claude Code** 是最常见的消费者。把 `ANTHROPIC_BASE_URL` 指向 hub，`ANTHROPIC_API_KEY` 填消费者令牌。`--model` 参数直接用别名：`claude --model peng/sonnet`。如果 Claude Code 残留旧 OAuth 登录态，它会覆盖环境变量配置——用 `/login` 切换或清理已存的凭证。
 
-**Codex** 默认走 Responses 线协议。`responses` 协议的 offering 开箱即用；`chat` 协议的 offering 在 Codex 配置里加 `wire_api = "chat"` 即可。模型别名写进 provider 配置，Codex 把它当普通模型对待。
+**Codex** 走 Responses 线协议。别名必须挂在 `responses` 协议的 offering 上 —— `wire_api = "chat"` 在 2026-02 已被移除，不再可用。模型别名写进 provider 配置，Codex 把它当普通模型对待。
 
 **OpenCode** 用同样的方式走 `openai-chat` 或 `openai-responses`。把 `OPENAI_BASE_URL` 指到 hub 的 `/v1` 端点，按别名开始调用。OpenCode 的 `@`-agent 调用可以把子任务路由到不同模型——aweshare 负责上游中继，OpenCode 负责智能体选择。
 

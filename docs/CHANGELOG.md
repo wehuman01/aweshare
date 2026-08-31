@@ -3,6 +3,20 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.6.3] - 2026-08-31
+
+### Added
+
+- **LAST SEEN — the hub's freshness evidence in every offering table** (`consumer list`, `hub list offerings`/`hub status`, `producer list`): how long ago real traffic or a recovery probe last proved the offering actually served (`-` = never). Producer heartbeats now report every backend, not just degraded ones — healthy entries carry `lastOkAt` — and the catalog's new `hubCheckAt` is the newer of that stamp and the traffic-derived `observedAt`. Old hubs and old agents degrade to `'-'` on either side.
+- **Per-consumer probe budget** — probe-shaped requests (a single-turn `'ping'` with a minimal token cap: what `consumer list --ping` and hand-rolled smoke-test curls send) are counted per consumer per day, shared across aliases, and answered with 429 `PROBE_BUDGET_EXCEEDED` naming the budget once spent; real requests are never counted. Default 15, tunable hub-wide via `consumerProbeBudget` (config.toml / `AWESHARE_CONSUMER_PROBE_BUDGET`, 0 = unlimited) or per consumer via `hub limits NAME --probe-budget N`; executed probes are flagged in the usage rows (`usage_events.probe`, schema v16).
+
+### Changed
+
+- **`consumer ping` folded into `consumer list --ping`** — one entry point instead of two commands sharing the same flags. The plain view stays free (and now carries LAST SEEN); `--ping` appends the consumer's own proof: one minimal real request per offering through the same `/v1` endpoints an SDK hits, with RESULT/TIME/DETAIL inserted before OBSERVED MODEL so the hub's claim and your own test sit side by side. Lines stream per alias as pings settle; offline/blocked rows show SKIP unpinged; `--alias` scopes both view and pings; `--json` attaches each row's result; exit code is 1 only when a pinged row fails (the plain list always exits 0). The standalone `consumer ping` subcommand from earlier in this unreleased cycle never shipped and is replaced.
+- **Ping diagnostics fixed** — a timed-out ping now reports the 60s it actually waited (the message previously hardcoded the control path's 10s); error bodies without a message fall back to the raw `HTTP <status>` instead of a usually-empty statusText; the RESULT column fits `FAIL (network)` so streamed rows stay column-aligned.
+
+## [Unreleased]
+
 ## [0.6.2] - 2026-08-31
 
 ### Added

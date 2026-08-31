@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.2-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.3-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -207,7 +207,7 @@ claude --model peng/sonnet
 
 Claude Code 若残留旧 OAuth 登录态会覆盖环境变量配置，用 `/login` 切换或清理 credentials。
 
-**Codex**（默认的 Responses 线协议即可用——别名需挂在 `responses` 协议的 offering 上；`wire_api = "chat"` 对 `openai` 协议的 offering 同样可用）
+**Codex**（必须指向 `responses` 协议的 offering —— `wire_api = "chat"` 在 2026-02 已被移除，不再可用）
 
 ```toml
 [model_providers.aweshare]
@@ -299,6 +299,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `rps` / `burst` / `maxConcurrent` | 覆盖该消费者的全局限流/并发默认值 | 429 `RATE_LIMITED` |
 | `tpm` | 任意滑动 60 秒窗口内的 token 上限（prompt + completion） | 429 `RATE_LIMITED`（内存窗口，与 RPS 桶一致） |
 | `maxTotalTokens` | 该消费者的终身 token 预算 | 429 `QUOTA_EXCEEDED`（对 `usage_events` 求和） |
+| `probeBudget` | 探测形状的请求（单轮 `'ping'` + 最小 token 上限——`consumer list --ping`、冒烟测试 curl）每日次数，跨别名共享；0 = 不限 | 429 `PROBE_BUDGET_EXCEEDED`（按北京时间当日的 `usage_events` 计数） |
 
 诚实的限制说明：token 类上限只统计上游报告的用量——Ollama 流式响应不带 usage，按 0 计。TPM 和终身预算都是基于已观测用量的阈值，不是预留式硬上限：单个请求可能跨过阈值，先于已有请求用量落库的并发请求还会进一步超额；已记录用量达到阈值后，新请求才会被拒绝。
 
@@ -336,7 +337,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub list producers [--json]` · `aweshare hub list consumers [--json]` | 名册：名字、状态（active/suspended/built-in）、在线与否（producers）、最近活跃、创建时间 |
 | `aweshare hub list offerings [--json]` | 目录：按去重 alias 计数的模型健康（一个别名多协议只算一个、取最差状态），一个别名一行——列与 `consumer list`/`producer list` 完全一致、问题状态在前——含自报模型、限额、实时占用（`IN USE n/max`）与当日剩余 token |
 | `aweshare hub status` | 实时仪表盘：容量（producer 席位、consumer 数、offering 计数）、来自用量汇总的最近 5 分钟请求/成功率/错误行（hub 准入类 429 不计量）、准入拒绝压力（被限流最狠的 alias/消费者）与生效的消费者默认限额 |
-| `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
+| `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--probe-budget N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
 | `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|producer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，最近使用的在最上面——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印；`--sort` 换排序（consumer/producer/model 字母序，tokens/requests 最忙在前） · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
 | `aweshare hub produce refresh NAME [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | 当日中途重开某个 hub 自有模型的 token 额度（`hub/` 前缀可省）：裸调用把今日窗口重新起算，`--add N` 把今日上限提高 N 个 token 直到北京时间午夜，`--clear` 清掉两个标记。仅限 hub 自有（`hub/…`）模型——producer 的模型归它自己刷新。`--all` 一条命令裸刷新全部有日限额的 `hub/…` 模型（无限额的会提示跳过；单个失败不中断其余） |
 
@@ -366,7 +367,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list invites --token` 找回） |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
-| `aweshare consumer ping --hub URL --token asc_… [--alias a,b]` | 端到端检测：对每个在线 offering 行发一次最小真实模型请求（SDK 同构，`max_tokens:1`），按别名/协议报告状态、往返延迟与上游自报模型——FAIL 会原样透传 hub/上游错误。真实调用消耗配额，用 `--alias` 缩小范围；任一失败退出码为 1 |
+| `aweshare consumer list --hub URL --token asc_… [--all] [--json] [--ping] [--alias a,b]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额、即时占用、当日剩余 token，以及 LAST SEEN——hub 的新鲜度证据（多久之前真实流量或恢复探测最后一次证实该 offering 服务过；`-` = 从未）。`--ping` 附上消费者自己的实测：对每个 offering 行发一次最小真实模型请求（SDK 同构，`max_tokens:1`，走同一批 `/v1` 端点），报告 RESULT、往返 TIME 与上游自报模型——FAIL 原样透传 hub/上游错误。真实调用消耗生产者配额，用 `--alias` 缩小范围；hub 对探测形状的请求有每日预算（默认每消费者 15 次，`consumerProbeBudget`）；任一实测失败退出码为 1（不带 `--ping` 恒为 0） |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 
@@ -385,6 +386,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 | `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | 数据目录（SQLite/pepper/admin token/config.toml，挂卷即备份） |
 | `AWESHARE_HUB_PORT` / `HOST` | 8787 / 0.0.0.0 | 监听 |
 | `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | 每消费者限流 |
+| `AWESHARE_CONSUMER_PROBE_BUDGET` | 15 | 探测形状请求（`'ping'` 诊断）每消费者每日次数；0 = 不限 |
 | `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 120000 | 响应头超时 / 流空闲超时 |
 | `AWESHARE_MAX_BODY_BYTES` | 32MB | 请求体上限 |
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | 兑换入口的全局保险额度（格式合法的尝试，全体来源共享） |
@@ -397,7 +399,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 
 健康：Agent 心跳 15s，静默 45s 判死；后端 AUTH/QUOTA 连败 2 次自动降级（别名对消费者显示 degraded，停止派发），30s 探测恢复。同一生产者令牌新连接替换旧连接（latest-wins）。
 
-模型诚实：offering 的 `upstreamModel` 只是 producer 的声明——hub 把它与每个成功响应报告的模型 id（`model` / `message.model` / `response.model`）比较。这是声明一致性证据，不是底层模型权重的身份证明：producer 或上游路由器仍可能改写这段元数据。观测复用现有用量计量通道，不改写转发响应，并严格限定在同一 alias、protocol 和当前声明；结果通过 `OBSERVED MODEL`、`list usage --details` 以及 `/v1/catalog` 的 `observedModel`、`observedAt`、`modelMatch` 和兼容字段 `modelVerified` 展示。比对保留 token 边界：完全一致和明确日期/revision 后缀算肯定证据，允许厂商前缀；`gpt-4`/`gpt-4o`、`gpt-4o`/`gpt-4o-mini` 等相邻型号判为不符；响应只给出更宽泛型号时显示 `?`/`insufficient`，不算验证通过。处置仍分层：默认**只报告**，运营者可手动封 alias 或吊销整个 producer，也可选择连续 2 次不符后自动封禁；手动封禁优先于自动封禁。`producer doctor` 会探测每个不同的配置模型，并按同样的证据边界报告响应自报 id。
+模型诚实：offering 的 `upstreamModel` 只是 producer 的声明——hub 把它与每个成功响应报告的模型 id（`model` / `message.model` / `response.model`）比较。这是声明一致性证据，不是底层模型权重的身份证明：producer 或上游路由器仍可能改写这段元数据。观测复用现有用量计量通道，不改写转发响应，并严格限定在同一 alias、protocol 和当前声明；结果通过 `OBSERVED MODEL`、`list usage --details` 以及 `/v1/catalog` 的 `observedModel`、`observedAt`、`modelMatch` 和兼容字段 `modelVerified` 展示。catalog 还携带 `hubCheckAt`——该观测与服务端心跳上报的最近一次成功中较新者——渲染为 LAST SEEN 列：hub 的证据显示该 offering 上一次实际服务是多久前（`-` = 从未）。比对保留 token 边界：完全一致和明确日期/revision 后缀算肯定证据，允许厂商前缀；`gpt-4`/`gpt-4o`、`gpt-4o`/`gpt-4o-mini` 等相邻型号判为不符；响应只给出更宽泛型号时显示 `?`/`insufficient`，不算验证通过。处置仍分层：默认**只报告**，运营者可手动封 alias 或吊销整个 producer，也可选择连续 2 次不符后自动封禁；手动封禁优先于自动封禁。`producer doctor` 会探测每个不同的配置模型，并按同样的证据边界报告响应自报 id。
 
 升级 npm 安装：`aweshare self-update`（安装前会确认；`--check` 只看版本不改动）。npm 上有新版本时，CLI 每天最多提醒一次。
 

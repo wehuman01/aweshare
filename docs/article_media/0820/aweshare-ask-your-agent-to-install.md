@@ -139,7 +139,7 @@ The same consumer setup works across clients.
 
 **Claude Code** is the most common consumer. Point `ANTHROPIC_BASE_URL` at the hub and set `ANTHROPIC_API_KEY` to the consumer token. The `--model` flag takes the alias: `claude --model peng/sonnet`. If Claude Code has a stale OAuth login, it overrides the env config — switch with `/login` or clean stored credentials.
 
-**Codex** uses the Responses wire protocol by default. A `responses`-protocol offering works out of the box. A `chat`-protocol offering works with `wire_api = "chat"` in the Codex config. The model alias goes in the provider config, and Codex treats it like any other model.
+**Codex** uses the Responses wire protocol. The alias must be backed by a `responses`-protocol offering — `wire_api = "chat"` was removed in 2026-02 and no longer works. The model alias goes in the provider config, and Codex treats it like any other model.
 
 **OpenCode** uses `openai-chat` or `openai-responses` the same way. Set `OPENAI_BASE_URL` to the hub's `/v1` endpoint and start calling models by alias. The `@`-agent calling in OpenCode lets you route sub-tasks to different models — aweshare handles the upstream relay, OpenCode handles the agent selection.
 
