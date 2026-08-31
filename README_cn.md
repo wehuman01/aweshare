@@ -431,7 +431,7 @@ aweshare producer doctor
 
 结构：`packages/protocol`（线协议共享包）· `packages/producer-core`（生产者运行时共享包）· `apps/hub`（HTTP+WS+SQLite+CLI）· `apps/agent`（CLI）。设计文档在 `docs/specs/`，变更记录在 `docs/CHANGELOG.md`，贡献范围见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
-## 支持我们
+## 赞助与支持
 
 如果 aweshare 帮你省下了一份订阅或一台 GPU 机器，欢迎支持它：
 
