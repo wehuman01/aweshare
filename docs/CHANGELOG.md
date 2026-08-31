@@ -3,7 +3,7 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
-## [Unreleased]
+## [0.6.1] - 2026-08-31
 
 ### Added
 
