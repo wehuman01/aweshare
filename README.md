@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.3-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.4-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -302,7 +302,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `rps` / `burst` / `maxConcurrent` | override the hub-wide rate/inflight defaults for this consumer | 429 `RATE_LIMITED` |
 | `tpm` | max tokens (prompt + completion) in any sliding 60s window | 429 `RATE_LIMITED` (in-memory window, like the RPS bucket) |
 | `maxTotalTokens` | lifetime token budget for this consumer | 429 `QUOTA_EXCEEDED` (sums `usage_events`) |
-| `probeBudget` | probe-shaped requests (single-turn `'ping'`, minimal token cap — `consumer list --ping`, smoke-test curls) per day, shared across aliases; 0 = unlimited | 429 `PROBE_BUDGET_EXCEEDED` (counts `usage_events` since Beijing midnight) |
+| `probeBudget` | complete `consumer list --ping` runs per day, shared across aliases; 0 = unlimited | 429 `PROBE_BUDGET_EXCEEDED` (counts runs since Beijing midnight) |
 
 Honest limits: token-based caps count what upstreams report — Ollama streams report no usage, so they contribute 0. Both TPM and the lifetime budget are observed-usage thresholds, not hard reservations: one request can cross the threshold, and concurrent requests that start before earlier usage is recorded can overshoot it further. Once recorded usage has reached the threshold, new requests are rejected.
 
@@ -370,7 +370,7 @@ Every `list` table and `status` print aligned columns by default; append `--json
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | redeem a consumer invite into an `asc_` token — printed once with ready-to-paste SDK env vars (save it; the operator can re-view it with `hub list invites --token`) |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | discovery view of the hub: online offerings by default (degraded stay listed; `--all` includes offline) — every producer, alias, protocol, status, the per-offering caps, live occupancy (`IN USE n/max` — distinct consumers with a request in flight right now; an alias at `max/max` admits no new consumer until one settles) and remaining daily tokens |
-| `aweshare consumer list --hub URL --token asc_… [--all] [--json] [--ping] [--alias a,b]` | discovery view of the hub: every producer, alias, protocol, status, the per-offering caps, live occupancy, remaining daily tokens and LAST SEEN — the hub's freshness evidence (how long ago real traffic or a recovery probe last proved an offering served; `-` = never). `--ping` adds the consumer's own proof: one minimal real model request per offering row (SDK-shaped, `max_tokens:1`) through the same `/v1` endpoints, reporting RESULT, round-trip TIME and the served model — a FAIL passes the hub/upstream error through verbatim. Real calls consume the producer's quota, so scope with `--alias`; the hub budgets probe-shaped requests (15/day per consumer by default, `consumerProbeBudget`); exit 1 on any pinged failure (plain list always exits 0) |
+| `aweshare consumer list --hub URL --token asc_… [--all] [--json] [--ping] [--alias a,b]` | discovery view of the hub: every producer, alias, protocol, status, the per-offering caps, live occupancy, remaining daily tokens and LAST SEEN — the hub's freshness evidence (how long ago real traffic or a recovery probe last proved an offering served; `-` = never). `--ping` adds the consumer's own proof: one minimal real model request per offering row (SDK-shaped, `max_tokens:1`) through the same `/v1` endpoints, reporting RESULT, round-trip TIME and the served model — a FAIL passes the hub/upstream error through verbatim. Real calls consume the producer's quota, so scope with `--alias`; the hub budgets complete `--ping` runs (10/day per consumer by default, `consumerProbeBudget`), not individual rows; exit 1 on any pinged failure (plain list always exits 0) |
 
 CLI maintenance: `aweshare self-update [--check]` updates the npm-installed CLI (`--check` only compares versions).
 
@@ -389,7 +389,7 @@ The hub reads `config.toml` from its data dir (`~/.aweshare-hub/config.toml`; Do
 | `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | data dir (SQLite/pepper/admin token/config.toml; volume-mount = backup) |
 | `AWESHARE_HUB_PORT` / `HOST` | 8787 / 0.0.0.0 | listen address |
 | `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | per-consumer limits |
-| `AWESHARE_CONSUMER_PROBE_BUDGET` | 15 | probe-shaped requests (`'ping'` diagnostics) per consumer per day; 0 = unlimited |
+| `AWESHARE_CONSUMER_PROBE_BUDGET` | 10 | complete `consumer list --ping` runs per consumer per day; 0 = unlimited |
 | `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 120000 | response-head timeout / stream idle timeout |
 | `AWESHARE_MAX_BODY_BYTES` | 32MB | request body cap |
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | redeem entry global insurance budget (valid-format attempts shared by every origin) |

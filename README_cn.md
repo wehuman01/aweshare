@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.3-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.4-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -299,7 +299,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `rps` / `burst` / `maxConcurrent` | 覆盖该消费者的全局限流/并发默认值 | 429 `RATE_LIMITED` |
 | `tpm` | 任意滑动 60 秒窗口内的 token 上限（prompt + completion） | 429 `RATE_LIMITED`（内存窗口，与 RPS 桶一致） |
 | `maxTotalTokens` | 该消费者的终身 token 预算 | 429 `QUOTA_EXCEEDED`（对 `usage_events` 求和） |
-| `probeBudget` | 探测形状的请求（单轮 `'ping'` + 最小 token 上限——`consumer list --ping`、冒烟测试 curl）每日次数，跨别名共享；0 = 不限 | 429 `PROBE_BUDGET_EXCEEDED`（按北京时间当日的 `usage_events` 计数） |
+| `probeBudget` | 完整 `consumer list --ping` 循环每日次数，跨别名共享；0 = 不限 | 429 `PROBE_BUDGET_EXCEEDED`（按北京时间当日循环计数） |
 
 诚实的限制说明：token 类上限只统计上游报告的用量——Ollama 流式响应不带 usage，按 0 计。TPM 和终身预算都是基于已观测用量的阈值，不是预留式硬上限：单个请求可能跨过阈值，先于已有请求用量落库的并发请求还会进一步超额；已记录用量达到阈值后，新请求才会被拒绝。
 
@@ -367,7 +367,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list invites --token` 找回） |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
-| `aweshare consumer list --hub URL --token asc_… [--all] [--json] [--ping] [--alias a,b]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额、即时占用、当日剩余 token，以及 LAST SEEN——hub 的新鲜度证据（多久之前真实流量或恢复探测最后一次证实该 offering 服务过；`-` = 从未）。`--ping` 附上消费者自己的实测：对每个 offering 行发一次最小真实模型请求（SDK 同构，`max_tokens:1`，走同一批 `/v1` 端点），报告 RESULT、往返 TIME 与上游自报模型——FAIL 原样透传 hub/上游错误。真实调用消耗生产者配额，用 `--alias` 缩小范围；hub 对探测形状的请求有每日预算（默认每消费者 15 次，`consumerProbeBudget`）；任一实测失败退出码为 1（不带 `--ping` 恒为 0） |
+| `aweshare consumer list --hub URL --token asc_… [--all] [--json] [--ping] [--alias a,b]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额、即时占用、当日剩余 token，以及 LAST SEEN——hub 的新鲜度证据（多久之前真实流量或恢复探测最后一次证实该 offering 服务过；`-` = 从未）。`--ping` 附上消费者自己的实测：对每个 offering 行发一次最小真实模型请求（SDK 同构，`max_tokens:1`，走同一批 `/v1` 端点），报告 RESULT、往返 TIME 与上游自报模型——FAIL 原样透传 hub/上游错误。真实调用消耗生产者配额，用 `--alias` 缩小范围；hub 按完整 `--ping` 循环计每日预算（默认每消费者 10 次，`consumerProbeBudget`），不按行计；任一实测失败退出码为 1（不带 `--ping` 恒为 0） |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
 
@@ -386,7 +386,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 | `AWESHARE_HUB_DATA_DIR` | `~/.aweshare-hub` | 数据目录（SQLite/pepper/admin token/config.toml，挂卷即备份） |
 | `AWESHARE_HUB_PORT` / `HOST` | 8787 / 0.0.0.0 | 监听 |
 | `AWESHARE_CONSUMER_RPS` / `BURST` / `CONCURRENCY` | 10 / 20 / 8 | 每消费者限流 |
-| `AWESHARE_CONSUMER_PROBE_BUDGET` | 15 | 探测形状请求（`'ping'` 诊断）每消费者每日次数；0 = 不限 |
+| `AWESHARE_CONSUMER_PROBE_BUDGET` | 10 | 完整 `consumer list --ping` 循环每消费者每日次数；0 = 不限 |
 | `AWESHARE_HEAD_TIMEOUT_MS` / `IDLE_TIMEOUT_MS` | 120000 / 120000 | 响应头超时 / 流空闲超时 |
 | `AWESHARE_MAX_BODY_BYTES` | 32MB | 请求体上限 |
 | `AWESHARE_INVITE_REDEEM_PER_MIN` | 10 | 兑换入口的全局保险额度（格式合法的尝试，全体来源共享） |

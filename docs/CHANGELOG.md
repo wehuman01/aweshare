@@ -15,6 +15,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **`consumer ping` folded into `consumer list --ping`** — one entry point instead of two commands sharing the same flags. The plain view stays free (and now carries LAST SEEN); `--ping` appends the consumer's own proof: one minimal real request per offering through the same `/v1` endpoints an SDK hits, with RESULT/TIME/DETAIL inserted before OBSERVED MODEL so the hub's claim and your own test sit side by side. Lines stream per alias as pings settle; offline/blocked rows show SKIP unpinged; `--alias` scopes both view and pings; `--json` attaches each row's result; exit code is 1 only when a pinged row fails (the plain list always exits 0). The standalone `consumer ping` subcommand from earlier in this unreleased cycle never shipped and is replaced.
 - **Ping diagnostics fixed** — a timed-out ping now reports the 60s it actually waited (the message previously hardcoded the control path's 10s); error bodies without a message fall back to the raw `HTTP <status>` instead of a usually-empty statusText; the RESULT column fits `FAIL (network)` so streamed rows stay column-aligned.
 
+## [0.6.4] - 2026-09-01
+
+### Changed
+
+- **Probe budget semantics: per-run instead of per-request** — a complete `consumer list --ping` cycle now counts as one budget unit regardless of how many offering rows it probes (was: one unit per probed row). The consumer CLI labels every request in a cycle with the same `x-aweshare-probe-run` UUID header; the hub tracks run admissions in a new `probe_runs` table (schema v17) with `admitProbeRun()`, an atomic check-and-record that prevents double-counting across concurrent requests. The default budget is 10 runs/day per consumer (was 15), tunable via `consumerProbeBudget` / `--probe-budget`; individual probe requests remain flagged in usage rows (`usage_events.probe`), while run admissions live in the new table. Hand-rolled smoke tests without a valid run header are treated as their own one-request run — they cannot suppress accounting by reusing a fixed header.
+
 ## [Unreleased]
 
 ## [0.6.2] - 2026-08-31

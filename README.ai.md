@@ -207,7 +207,7 @@ After config edits on a running producer, `aweshare producer reload` applies the
    aweshare consumer list --hub https://hub.example.com --token asc_...
    ```
    Every producer, alias, protocol, status, caps, live occupancy and remaining daily tokens.
-4. Verify offerings end-to-end (real model calls, consume quota — scope with `--alias`; the hub budgets probe-shaped requests at 15/day per consumer):
+4. Verify offerings end-to-end (real model calls, consume quota — scope with `--alias`; the hub budgets complete `--ping` runs at 10/day per consumer):
    ```bash
    aweshare consumer list --hub https://hub.example.com --token asc_... --ping
    ```

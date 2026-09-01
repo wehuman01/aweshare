@@ -171,7 +171,7 @@ curl https://aweshare.wehuman.top/v1/chat/completions \
 
 **某个模型返回 503。** 它的生产者掉线了。只能等——看 `consumer list` 里的 STATUS。
 
-**现在哪些模型真的能用？** `consumer list` 免费回答大半：LAST SEEN 是 hub 自己的新鲜度证据（多久之前真实流量或恢复探测最后一次证实该 offering 服务过）。`aweshare consumer list --hub … --token asc_… --ping [--alias 名字]` 再加上你自己的实测：每个 offering 一次最小真实请求，走 SDK 同款链路——状态、延迟、上游自报模型。真实调用消耗配额，用 `--alias` 缩小范围；hub 对探测形状的请求有每日预算（默认每消费者 15 次），用尽会得到 429 PROBE_BUDGET_EXCEEDED。
+**现在哪些模型真的能用？** `consumer list` 免费回答大半：LAST SEEN 是 hub 自己的新鲜度证据（多久之前真实流量或恢复探测最后一次证实该 offering 服务过）。`aweshare consumer list --hub … --token asc_… --ping [--alias 名字]` 再加上你自己的实测：每个 offering 一次最小真实请求，走 SDK 同款链路——状态、延迟、上游自报模型。真实调用消耗配额，用 `--alias` 缩小范围；hub 按完整 `--ping` 循环计每日预算（默认每消费者 10 次），不按行计；用尽会得到 429 PROBE_BUDGET_EXCEEDED。
 
 **我的 Claude Code 只会说 Anthropic 方言，别名却是 `openai`。** 正常——hub 不做协议翻译。按别名的 protocol 列选对应端点；工具实在不支持切换的话，本地加一层翻译代理。
 

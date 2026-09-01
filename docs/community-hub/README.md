@@ -171,7 +171,7 @@ Per-offering guardrails are set by the producer (`maxConcurrencyPerUser` — con
 
 **A model answers 503.** Its producer is offline. Nothing you can do but wait — check STATUS in `consumer list`.
 
-**Which offerings actually work right now?** `consumer list` already answers most of it for free: LAST SEEN is the hub's own freshness evidence (how long ago real traffic or a recovery probe last proved an offering served). `aweshare consumer list --hub … --token asc_… --ping [--alias name]` adds your own proof: one minimal real request per offering through the same path your SDK uses — status, latency and the served model. Real calls consume quota, so scope with `--alias`; the hub budgets probe-shaped requests (15/day per consumer by default), so a budgeted-out run answers 429 PROBE_BUDGET_EXCEEDED.
+**Which offerings actually work right now?** `consumer list` already answers most of it for free: LAST SEEN is the hub's own freshness evidence (how long ago real traffic or a recovery probe last proved an offering served). `aweshare consumer list --hub … --token asc_… --ping [--alias name]` adds your own proof: one minimal real request per offering through the same path your SDK uses — status, latency and the served model. Real calls consume quota, so scope with `--alias`; the hub budgets complete `--ping` runs (10/day per consumer by default), not individual rows, so a budgeted-out run answers 429 PROBE_BUDGET_EXCEEDED.
 
 **My Claude Code only speaks Anthropic and the alias is `openai`.** Correct — the hub does not translate protocols. Use an endpoint matching the alias's protocol column, or a local translation proxy if your tool has no such setting.
 
