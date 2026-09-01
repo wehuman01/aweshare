@@ -17,9 +17,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [0.6.4] - 2026-09-01
 
+### Added
+
+- **`consumer list --ping --ping-table`** — the run's verdict as two tables rendered once it completes instead of one streamed line per ping: a FAIL table first (PRODUCER/ALIAS/PROTOCOL/STATUS/TIME/DETAIL — STATUS carries the HTTP code, or `network` when no answer came) and an OK table below (served model, TIME), each titled with its count; offline/blocked SKIP rows stay out of both, their count still on the header line. Streaming remains the default; `--ping-table` implies `--ping`, keeps the wait visible with one rewritten progress line on stderr (silent when piped, so redirected stdout stays pure tables), and refuses only `--json`.
+
 ### Changed
 
 - **Probe budget semantics: per-run instead of per-request** — a complete `consumer list --ping` cycle now counts as one budget unit regardless of how many offering rows it probes (was: one unit per probed row). The consumer CLI labels every request in a cycle with the same `x-aweshare-probe-run` UUID header; the hub tracks run admissions in a new `probe_runs` table (schema v17) with `admitProbeRun()`, an atomic check-and-record that prevents double-counting across concurrent requests. The default budget is 10 runs/day per consumer (was 15), tunable via `consumerProbeBudget` / `--probe-budget`; individual probe requests remain flagged in usage rows (`usage_events.probe`), while run admissions live in the new table. Hand-rolled smoke tests without a valid run header are treated as their own one-request run — they cannot suppress accounting by reusing a fixed header.
+
+## [0.6.5] - 2026-09-01
+
+### Changed
+
+- **`--ping-table` now implies `--ping`** — `consumer list --ping-table` no longer requires the separate `--ping` flag; the table mode automatically enables pinging and shows progress on stderr while it runs (silent when piped, so redirected stdout stays pure tables). The two flags can still be combined for clarity.
+- **`--ping-table` refuses `--json`** — the table output is a text view; passing `--json` with `--ping-table` now fails loudly instead of silently ignoring the table flag.
 
 ## [Unreleased]
 
