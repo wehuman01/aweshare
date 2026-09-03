@@ -1,4 +1,4 @@
-# aweshare update: Sharing You Can See — Usage, Models, and Honesty, One Command Away
+# aweshare update: Sharing You Can See — Usage, Models, Honesty, and End-to-End Ping, One Command Away
 
 ![aweshare](../../logo/logo.png)
 
@@ -8,8 +8,9 @@ Once sharing is live, the questions change. Before launch, everyone asks "is thi
 - "Who's using my shared models, and how much?"
 - "What's available on the hub at this moment?"
 - "That alias claims to be qwen — is qwen what actually answers?"
+- "The hub says it's online — does it actually work for me, and how slow is it?"
 
-Until now these were either unanswerable or meant digging through server logs. This update turns each of them into a one-command affair — a dashboard for the whole sharing arrangement.
+Until now these were either unanswerable or meant digging through server logs. This update turns each of them into a one-command affair — a dashboard for the whole sharing arrangement, plus an end-to-end ping so you stop trusting "online" at face value and prove it yourself.
 
 GitHub: [github.com/wehuman01/aweshare](https://github.com/wehuman01/aweshare)
 
@@ -150,6 +151,34 @@ aweshare hub offering restore ns/model  # bring it back
 
 A blocked alias answers new requests with a clear 503 while the producer's other models are untouched. Or let the hub handle it automatically: set one env var and repeated mismatches auto-block the offering (report-only by default).
 
+## End-to-End Ping: Don't Trust, Verify
+
+The hub tells you a model is "online" — but online doesn't mean it works for you. This update gives consumers a way to prove it for real: **end-to-end ping**.
+
+Add `--ping` to `consumer list`:
+
+```bash
+aweshare consumer list --hub https://your-hub.example --token asc_... --ping [--alias a,b]
+```
+
+Each online offering gets one minimal real request (SDK-compatible `/v1` endpoint, `max_tokens:1`), and the output gains three columns: **RESULT** (OK / FAIL), **TIME** (round-trip in ms), and **DETAIL** (hub or upstream error verbatim on failure). If the declared name doesn't match what the upstream actually served, the `OBSERVED MODEL` column shows `✗` — the hub's record and your own test, side by side.
+
+> Real model calls consume the producer's quota. Use `--alias` to scope the run.
+
+### --ping-table: Tabular Results
+
+Streaming line-by-line is the default for `--ping`. Want to wait for everything to finish and see a clean summary? Add `--ping-table`:
+
+```bash
+aweshare consumer list --hub https://your-hub.example --token asc_... --ping --ping-table
+```
+
+When the run completes, you get a **FAIL table** first (with HTTP status or `network`) and an **OK table** below (served model, latency), each titled with its count; a progress line on stderr shows the wait (suppressed when piped so stdout stays pure tables).
+
+### Daily Budget
+
+`--ping` isn't unlimited. The hub charges per **complete run**: one full `consumer list --ping` cycle costs one budget unit regardless of how many alias rows it probes. Default is 10 runs per consumer per day; when spent you'll get 429 `PROBE_BUDGET_EXCEEDED` — real requests are never affected. Operators can override per-consumer with `hub limits NAME --probe-budget N`.
+
 ## Cheat Sheet
 
 | You want to know | Run |
@@ -161,7 +190,10 @@ A blocked alias answers new requests with a clear 503 while the producer's other
 | The hub at a glance: occupancy, quotas, 5-minute health | `aweshare hub status` |
 | Busiest consumer? Busiest model? | `aweshare hub usage` |
 | Is the declared model what actually answers? | Read the `OBSERVED MODEL` column |
+| End-to-end proof — don't trust, verify | `aweshare consumer list --ping [--alias a,b]` |
+| Wait for all pings, then see a summary table | `aweshare consumer list --ping --ping-table` |
 | Name doesn't hold up — block just this alias | `aweshare hub offering block <alias>` |
+| Adjust a single consumer's daily ping budget | `aweshare hub limits NAME --probe-budget N` |
 
 One-line summary: sharing graduates from "trust that everyone plays fair" to "everyone can see the facts themselves" — consumers see quota and protocol, producers see their shelf and their users, operators see the ledger, and the hub sees every model's real name.
 
@@ -198,13 +230,38 @@ Sharing no longer runs on good faith. Who used how much, what's left, and whethe
 
 Email [peng@wehuman.top](mailto:peng@wehuman.top) — who you are, whether you want to share or consume, and what backend you'll bring. Bugs in aweshare itself go to [GitHub issues](https://github.com/wehuman01/aweshare/issues).
 
-## More from mugpeng
+## aweshare Series
 
-aweshare is part of the aweteam ecosystem:
+- [aweshare: Stepping into the Token Sharing Era](https://mp.weixin.qq.com/s/zFRIuxdLj6F5vPj9P7rXAQ)
+- [aweshare: I Let My Agent Share My Tokens](https://github.com/wehuman01/aweshare/blob/main/docs/article_media/0820/aweshare-ask-your-agent-to-install.md) / [aweshare：我把 agent 变成了共享节点](https://github.com/wehuman01/aweshare/blob/main/docs/article_media/0820/aweshare-ask-your-agent-to-install-zh-CN.md)
+- [aweshare Dev Note: I Hid My Hub Behind a Cloudflare Tunnel](https://github.com/wehuman01/aweshare/blob/main/docs/article_media/0822/aweshare-hub-cloudflare-tunnel-en.md) / [aweshare 开发笔记：我把 Hub 藏到了 Cloudflare Tunnel 后面](https://github.com/wehuman01/aweshare/blob/main/docs/article_media/0822/aweshare-hub-cloudflare-tunnel.md)
+- [aweshare Community Hub Opens for Beta: 10 Consumer Spots, Unlimited Producers](https://github.com/wehuman01/aweshare/blob/main/docs/article_media/0827/aweshare-community-hub-beta-10-spots.md) / [aweshare 社区 Hub 开放 Beta：10 个消费者名额，生产者不设限](https://github.com/wehuman01/aweshare/blob/main/docs/article_media/0827/aweshare-community-hub-beta-10-spots-zh-CN.md)
+- [aweshare's Three Roles: Who Provides Compute, Who Uses It, Who Keeps the Gate](https://github.com/wehuman01/aweshare/blob/main/docs/article_media/0828/aweshare-three-roles.md) / [aweshare 设计哲学1：谁出算力，谁来用，谁来守门](https://github.com/wehuman01/aweshare/blob/main/docs/article_media/0828/aweshare-three-roles-zh-CN.md)
+- **This article: Sharing You Can See — Usage, Models, Honesty, and End-to-End Ping** (you are reading the English version)
 
-- **[aweskill](https://aweskill.webioinfo.top/)** — CLI-first skill package manager supporting 47+ AI coding agents
-- **[aweswitch](https://github.com/Webioinfo01/aweswitch)** — agent config switcher for Claude Code, Codex, and OpenCode
-- **[awerouter](https://github.com/mugpeng/awerouter)** — smart router that uses structural signals to route requests to Flash or Pro models, reducing unnecessary model costs
-- **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — save, organize, and restore AI coding sessions; pair it with aweswitch to save configurations and launch with one click
-- **[aweshare](https://github.com/wehuman01/aweshare)** — share local Ollama/vLLM or authorized OpenAI/Anthropic backends through a self-hosted Hub, enabling a shared token economy
-- **[awewarm](https://github.com/wehuman01/awewarm)** — subscription-window keeper that keeps AI coding-plan windows active, whether configured locally or through a remotely connected server
+## aweshare 系列文章
+
+- [aweshare：迈入共享token 时代](https://mp.weixin.qq.com/s/zFRIuxdLj6F5vPj9P7rXAQ)
+
+## Awesome Ecosystem
+
+aweshare is part of a growing family of "awesome" tools — CLI-first, local-first, and operable by AI agents.
+
+### CLI Tools
+
+- **[aweskill](https://aweskill.webioinfo.top/)** — CLI-first skill package manager supporting 47+ AI coding agents.
+- **[aweswitch](https://github.com/Webioinfo01/aweswitch)** — Agent profile switcher for Claude Code, Codex, and OpenCode.
+- **[awerouter](https://github.com/mugpeng/awerouter)** — Smart router that splits requests between Flash and Pro models using structural signals, cutting unnecessary model spend.
+- **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — Bookmark, categorize, and restore AI coding sessions; pairs with aweswitch to save profiles and launch with one command.
+- **[aweshare](https://github.com/wehuman01/aweshare)** — Share local Ollama/vLLM backends, domestic coding plans, or authorized OpenAI/Anthropic subscriptions through a self-hosted hub — a sharing economy for tokens.
+- **[awewarm](https://github.com/wehuman01/awewarm)** — Subscription window warmer that keeps AI coding-plan windows active, for local setups and through a remote hub server.
+- **[awescholar](https://github.com/Webioinfo01/awescholar)** — AI-agent-operable scientific literature discovery and curation.
+
+### Desktop Apps
+
+- **[awedot](https://awedot.wehuman.top/)** — A floating orb at your screen edge keeps track of the current AI session: bookmark it in one click, resume anytime, and pair with aweswitch to pin the agent's config (e.g., relaunch with the GLM model).
+
+### Project Collections
+
+- **[Awesome AI Meets Biology](https://github.com/Webioinfo01/Awesome-AI-Meets-Biology)** — A curated survey of AI applications in biology, bioinformatics, and biomedical research. Powered by awescholar.
+- **[Awesome AI Virtual Tumor](https://github.com/Webioinfo01/Awesome-AI-Virtual-Tumor)** — A curated collection of state-of-the-art AI systems for virtual tumor modeling and simulation: static models, dynamic models, agents, benchmarks, and reviews.

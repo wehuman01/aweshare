@@ -245,6 +245,7 @@ id = "codex-account"
 protocol = "responses"
 baseUrl = "https://chatgpt.com/backend-api/codex"
 login = "codex"                          # account auth instead of a key; exclusive with keyRef
+# proxyUrl = "http://127.0.0.1:7890"     # egress proxy for this backend (any backend may set one)
 
 [[offerings]]
 alias = "peng/qwen2.5.7b"                # namespace must be your producer name
@@ -277,7 +278,7 @@ Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; 
 
 - The login is read from `${CODEX_HOME|~/.codex}/auth.json`, stays in producer memory only, and is re-read whenever the file changes or a request comes back 401 — so a fresh `codex login` on the producer machine is picked up without a restart. No secrets.json entry exists for it.
 - The producer injects the headers the Codex CLI itself sends, forces `store: false`, and removes `max_output_tokens` emitted by some Responses SDKs (the chatgpt backend rejects it).
-- If the producer reaches ChatGPT through an HTTP(S) proxy, it honors `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, and `NO_PROXY` for this account-login upstream only. Proxy URLs are never logged; SOCKS proxies are not supported.
+- **Egress proxy (`proxyUrl`)**: when the upstream is only reachable through a proxy (e.g. a ladder such as Clash on `http://127.0.0.1:7890`), set `proxyUrl` on the backend — any backend, not just account logins (an `api.openai.com` key behind the same ladder qualifies). It covers that backend's http and https traffic only, hot-reloads with the config, and survives background/systemd starts, where shell environment variables silently vanish. Precedence: `proxyUrl` beats `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`; the env vars alone still apply to codex-login backends only, so a machine-wide proxy setting can never capture a local Ollama. `NO_PROXY` is always honored; SOCKS is rejected at config load. `producer doctor` TCP-probes a configured proxy and fails loudly when it is down, and proxy URLs are redacted in `producer config show` (they can carry credentials) and never logged.
 - Consumers must speak `/v1/responses`: Codex CLI (default `wire_api`), opencode (via `@ai-sdk/openai`), Cline (OpenAI Native provider). Chat-completions tools and Claude Code cannot use these offerings.
 - Tokens are never refreshed by aweshare: when the login expires the offering degrades (2 consecutive 401s → 503 `BACKEND_DEGRADED`) and recovers on its own once you re-run `codex login` — the 30s recovery probe re-reads the file.
 - Sharing a subscription login is **higher-risk than sharing an API key** — see the compliance section above: the credential is account-wide, and the producer bears suspension of the whole account.

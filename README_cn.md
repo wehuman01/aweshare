@@ -244,6 +244,7 @@ id = "codex-account"
 protocol = "responses"
 baseUrl = "https://chatgpt.com/backend-api/codex"
 login = "codex"                          # 用本机 CLI 登录代替 key；与 keyRef 互斥
+# proxyUrl = "http://127.0.0.1:7890"     # 该后端的出口代理（任何后端都可设置）
 
 [[offerings]]
 alias = "peng/qwen2.5.7b"                # 命名空间必须是你的生产者 name
@@ -274,7 +275,7 @@ maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并�
 
 - 登录凭据读自 `${CODEX_HOME|~/.codex}/auth.json`，只存在于生产者进程内存；文件变化或请求返回 401 时自动重读——生产者重新 `codex login` 后无需重启。secrets.json 里没有它的条目。
 - 生产者注入 Codex CLI 自己携带的原生请求头，强制 `store: false`，并删除部分 Responses SDK 会发送、但 chatgpt 后端拒绝的 `max_output_tokens`。
-- 若生产者通过 HTTP(S) 代理访问 ChatGPT，仅这个账号登录上游会读取 `HTTPS_PROXY`、`HTTP_PROXY`、`ALL_PROXY` 与 `NO_PROXY`。日志绝不输出代理 URL；暂不支持 SOCKS 代理。
+- **出口代理（`proxyUrl`）**：上游必须走代理才可达时（如本地 Clash 的 `http://127.0.0.1:7890`），在后端块里直接设 `proxyUrl`——任何后端都行，不限于账号登录（同样要梯子的 `api.openai.com` key 后端也算）。它只作用于该后端的 http/https 流量，随配置热重载，后台/开机自启场景也不会丢——shell 环境变量在这些场景会静默消失。优先级：`proxyUrl` > `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`；仅有环境变量时依旧只对 codex 登录后端生效，机器级代理设置绝不会截走本地 Ollama。`NO_PROXY` 始终生效；SOCKS 在配置加载时即被拒绝。`producer doctor` 会对配置的代理做 TCP 探测，代理没开直接报红；代理 URL 可能携带凭据，`producer config show` 中脱敏显示、绝不写日志。
 - 消费端只支持 `/v1/responses`：Codex CLI（默认 `wire_api`）、opencode（`@ai-sdk/openai`）、Cline（OpenAI Native）。chat-completions 工具和 Claude Code 用不了这类 offering。
 - aweshare 从不刷新 token：登录过期后该 offering 降级（连续 2 次 401 → 503 `BACKEND_DEGRADED`），生产者重新 `codex login` 后由 30s 探活自动恢复（探活会重读文件）。
 - 共享订阅登录比共享 API key **风险更高**——见上方合规段：凭据是账户级的，解锁该登录下的全部订阅；封号后果由生产者自行承担。

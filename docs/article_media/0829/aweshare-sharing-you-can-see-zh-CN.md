@@ -1,4 +1,4 @@
-# aweshare 更新：看得见的共享 —— 用量、模型、诚实度，一条命令看清
+# aweshare 更新：看得见的共享 —— 用量、模型、诚实度、端到端实测，一条命令看清
 
 ![aweshare](../../logo/logo.png)
 
@@ -8,8 +8,9 @@
 - 「谁在用我共享的模型？用了多少？」
 - 「hub 上现在都有什么可用的？」
 - 「这个 alias 说是 qwen，背后真跑的是 qwen 吗？」
+- 「hub 说在线，真能调通吗？延迟多少？」
 
-这些问题以前要么答不上来，要么得登服务器翻日志。这次更新把它们都变成一条命令的事——给共享装上仪表盘。
+这些问题以前要么答不上来，要么得登服务器翻日志。这次更新把它们都变成一条命令的事——给共享装上仪表盘，还多了一把实锤：**端到端 ping**，不再靠 hub 说"在线"就信，自己打一个请求才知道。
 
 GitHub：[github.com/wehuman01/aweshare](https://github.com/wehuman01/aweshare)
 
@@ -150,6 +151,34 @@ aweshare hub offering restore ns/model  # 恢复
 
 被封的 alias 对新请求直接回一个明确的 503，生产者的其他模型不受牵连。也可以设一个环境变量让 hub 自动处理：模型连续对不上号时自动下架该 offering（默认只记录、不处理）。
 
+## 用 ping 实测：不靠听，靠自己试
+
+hub 告诉你"这个模型在线"，但"在线"不等于"你能用"。这次更新给了消费者一把实锤：**端到端 ping**。
+
+用 `--ping` 给 `consumer list` 加上实测：
+
+```bash
+aweshare consumer list --hub https://your-hub.example --token asc_... --ping [--alias a,b]
+```
+
+每个在线 offering 都会发一次最小真实请求（SDK 同款 `/v1` 端点，`max_tokens:1`），输出里多出三列：**RESULT**（OK / FAIL）、**TIME**（往返毫秒）、**DETAIL**（失败时原样透传 hub 或上游的错误）。声明的名字和上游实际跑的对不上？`OBSERVED MODEL` 列就会打 `✗`——hub 的记账和你的实测，并排摆在一起。
+
+> 注意：`--ping` 发的是真实模型调用，会消耗生产者的配额。用 `--alias` 缩小范围更划算。
+
+### --ping-table：表格化结果
+
+默认 `--ping` 是逐行流式输出。想要等全部跑完再一张表看结果？加 `--ping-table`：
+
+```bash
+aweshare consumer list --hub https://your-hub.example --token asc_... --ping --ping-table
+```
+
+完成后终端会先输出一张 **FAIL 表**（包含 HTTP 状态码或 `network`），再输出一张 **OK 表**（服务模型、耗时），stderr 带进度条（管道输出时自动静默）。
+
+### 每日预算
+
+`--ping` 不是无限制的。hub 按**完整循环**计费：每跑完一次 `consumer list --ping`（不管测了几个 alias），消耗一次预算。默认每消费者每天 10 次，用尽后返回 429 `PROBE_BUDGET_EXCEEDED`；真实业务请求不受影响。运营商可以通过 `hub limits NAME --probe-budget N` 为单个消费者单独调整。
+
 ## 一张速查表
 
 | 你想问 | 跑哪条命令 |
@@ -161,7 +190,10 @@ aweshare hub offering restore ns/model  # 恢复
 | hub 全貌：占用、余量、5 分钟健康度 | `aweshare hub status` |
 | 谁用得最多？哪个模型最忙？ | `aweshare hub usage` |
 | 这个 alias 背后真的在跑声明的模型吗？ | 看 `OBSERVED MODEL` 列 |
+| 不靠听，靠自己试——端到端实测 | `aweshare consumer list --ping [--alias a,b]` |
+| 等全部跑完再看汇总表 | `aweshare consumer list --ping --ping-table` |
 | 发现名不副实，只封这一个 alias | `aweshare hub offering block <alias>` |
+| 调整单个消费者的 ping 每日预算 | `aweshare hub limits NAME --probe-budget N` |
 
 一句话总结：共享这件事，从「相信大家都会守规矩」变成「事实摆在明处，人人看得见」——消费者看得到余量和协议，生产者看得到自己的货架和用户，运营者看得到总账，hub 看得到每个模型的真实名字。
 
@@ -202,13 +234,30 @@ aweshare hub status
 
 现在支持的模型越来越多了。
 
-## More from mugpeng
+## aweshare 系列文章
 
-aweshare 是 aweteam 生态的一部分：
+- [aweshare：迈入共享token 时代](https://mp.weixin.qq.com/s/zFRIuxdLj6F5vPj9P7rXAQ)
+- [aweshare 社区：消费者 10 个名额，螃蟹先到的吃](https://mp.weixin.qq.com/s/iOU72DB-SESe4IktIIdvbQ)
 
-- **[aweskill](https://aweskill.webioinfo.top/)** — CLI 优先的技能包管理器，支持 47+ AI 编程 agent
-- **[aweswitch](https://github.com/Webioinfo01/aweswitch)** — Claude Code、Codex、OpenCode 的 agent 配置切换器
-- **[awerouter](https://github.com/mugpeng/awerouter)** — 智能路由器，用结构信号把请求分给 Flash 或 Pro 模型，减少不必要的模型开销
-- **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — 收藏、分类、恢复 AI 编程会话，还能搭配aweswitch 实现保存配置，一键启动
-- **[aweshare](https://github.com/wehuman01/aweshare)** — 通过自建 Hub 共享本地 Ollama/vLLM 或已授权的 OpenAI/Anthropic 后端，实现token 的共享经济
-- **[awewarm](https://github.com/wehuman01/awewarm)** — 订阅窗口保持器，让 AI 编程套餐的窗口持续激活，无论是本地设置，还是通过远程连接的服务器
+## Awesome Ecosystem
+
+aweshare 是一个不断壮大的 "awesome" 工具家族的一员 — CLI 优先、local-first，可被 AI agent 直接操作。
+
+### CLI 工具
+
+- **[aweskill](https://aweskill.webioinfo.top/)** — CLI 优先的技能包管理器，支持 47+ AI 编程 agent。
+- **[aweswitch](https://github.com/Webioinfo01/aweswitch)** — Claude Code、Codex、OpenCode 的 agent 配置切换器。
+- **[awerouter](https://github.com/mugpeng/awerouter)** — 智能路由器，用结构信号把请求分给 Flash 或 Pro 模型，减少不必要的模型开销。
+- **[aweshelf](https://github.com/Webioinfo01/aweshelf)** — 收藏、分类、恢复 AI 编程会话，还能搭配 aweswitch 实现保存配置，一键启动。
+- **[aweshare](https://github.com/wehuman01/aweshare)** — 通过自建 Hub 共享本地 Ollama/vLLM 或已授权的 OpenAI/Anthropic 后端，实现 token 的共享经济。
+- **[awewarm](https://github.com/wehuman01/awewarm)** — 订阅窗口保持器，让 AI 编程套餐的窗口持续激活，无论是本地设置，还是通过远程连接的服务器。
+- **[awescholar](https://github.com/Webioinfo01/awescholar)** — AI agent 可自主执行的科学文献发现与策展，搜索、标注、筛选和报告学术论文。
+
+### 桌面应用
+
+- **[awedot](https://awedot.wehuman.top/)** — 悬浮球驻留屏幕边缘，实时追踪当前 AI 会话；一键收藏、随时恢复，并可搭配 aweswitch 固定 agent 配置（比如用 GLM 模型启动）。
+
+### 项目合集
+
+- **[Awesome AI Meets Biology](https://github.com/Webioinfo01/Awesome-AI-Meets-Biology)** — AI 在生物学、生物信息学和生物医学研究中应用的精选综述。由 awescholar 驱动。
+- **[Awesome AI Virtual Tumor](https://github.com/Webioinfo01/Awesome-AI-Virtual-Tumor)** — 面向虚拟肿瘤建模与仿真的前沿 AI 系统精选合集：静态模型、动态模型、agent、基准与综述。

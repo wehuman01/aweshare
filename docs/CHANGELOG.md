@@ -32,7 +32,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **`--ping-table` now implies `--ping`** — `consumer list --ping-table` no longer requires the separate `--ping` flag; the table mode automatically enables pinging and shows progress on stderr while it runs (silent when piped, so redirected stdout stays pure tables). The two flags can still be combined for clarity.
 - **`--ping-table` refuses `--json`** — the table output is a text view; passing `--json` with `--ping-table` now fails loudly instead of silently ignoring the table flag.
 
+## [0.6.6] - 2026-09-03
+
+### Added
+
+- **Per-backend egress proxy (`proxyUrl`)** — a backend whose upstream needs a ladder (a Codex account login, or an `api.openai.com` key behind the same proxy) can now declare it in config: `proxyUrl = "http://127.0.0.1:7890"` inside its `[[backends]]` block. It covers that backend's http and https traffic only, hot-reloads with the config, and survives background/systemd starts where shell environment variables silently vanish. Precedence: `proxyUrl` over `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`; the env vars alone still apply to codex-login backends only (a machine-wide proxy setting can never capture a local Ollama). `NO_PROXY` is always honored; SOCKS or malformed URLs fail config load naming the backend. `producer doctor` gains a TCP reachability check for a configured proxy (the most common egress failure is the proxy itself being down) and names the active egress on the codex login check; proxy URLs are redacted in `producer config show` alongside tokens and never logged.
+
+### Fixed
+
+- **`producer config show` now redacts `proxyUrl` lines even when they are indented or carry a trailing comment** — a common TOML layout like `  proxyUrl = "http://user:pass@proxy:7890" # local proxy` used to leak the credentials in plain text. The redactor now preserves leading whitespace and trailing comments while replacing only the quoted value.
+- **`parseCatalog` no longer echoes the full `proxyUrl` in validation errors** — malformed or SOCKS proxy URLs now report the backend id and the requirement without printing the original URL, so config mistakes do not leak proxy credentials into logs or CI output.
+- **Hot-reloading `proxyUrl` now closes the previous proxy dispatcher** — repeated config reloads no longer leave pooled `EnvHttpProxyAgent` instances and sockets behind; the new route closes the old dispatcher before caching the replacement.
+
+### Documentation
+
+- Updated README and CHANGELOG guidance around `proxyUrl`, egress precedence, doctor output, and redaction behavior.
+
 ## [Unreleased]
+
+### Added
+
+- **Per-backend egress proxy (`proxyUrl`)** — a backend whose upstream needs a ladder (a Codex account login, or an `api.openai.com` key behind the same proxy) can now declare it in config: `proxyUrl = "http://127.0.0.1:7890"` inside its `[[backends]]` block. It covers that backend's http and https traffic only, hot-reloads with the config, and survives background/systemd starts where shell environment variables silently vanish. Precedence: `proxyUrl` over `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`; the env vars alone still apply to codex-login backends only (a machine-wide proxy setting can never capture a local Ollama). `NO_PROXY` is always honored; SOCKS or malformed URLs fail config load naming the backend. `producer doctor` gains a TCP reachability check for a configured proxy (the most common egress failure is the proxy itself being down) and names the active egress on the codex login check; proxy URLs are redacted in `producer config show` alongside tokens and never logged.
 
 ## [0.6.2] - 2026-08-31
 
