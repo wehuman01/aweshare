@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.5-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.7-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -160,6 +160,11 @@ aweshare producer doctor
 aweshare producer start            # foreground; add --background to detach it
 #    detached runs are checked with 'aweshare producer doctor --status'
 #    and stopped with 'aweshare producer stop'
+#    Or install a system service: starts now, starts automatically on boot,
+#    and restarts after a crash (macOS launchd / Linux systemd user service):
+aweshare producer start --install
+#    'producer stop' stops the current run only; boot still starts it.
+#    'producer stop --purge' also removes auto-start permanently.
 ```
 
 #### 3. Consumer first run (in this order)
@@ -360,10 +365,10 @@ Every `list` table and `status` print aligned columns by default; append `--json
 | `aweshare producer list [offerings] [--json] [--all]` | what this producer has registered on the hub — alias, protocol, live status, caps, live occupancy (`IN USE`, distinct consumers in flight right now), today's token use — plus the local background instance state and drift against config.toml (hubUrl/token come from config.toml); `--all`: every producer's registrations, the discovery view |
 | `aweshare producer list usage [--details] [--consumer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|model\|tokens\|requests] [--limit N] [--json]` | who used this producer's models (the producer token scopes the hub's metering to its own slice): aggregate per consumer × model by default, most recently used first (`--sort` re-orders), window defaults to 7d · `--details`: per-request log, newest first, each row naming its consumer |
 | `aweshare producer status` | the live one-glance summary: local process, config counts, registered-offering health rollup and drift — the full table is `list offerings` |
-| `aweshare producer start [--background]` | connect and relay (long-running; `--background` detaches it — logs to `~/.aweshare/producer.log`, pid to `producer.pid`) |
+| `aweshare producer start [--background \| --install]` | connect and relay (long-running; `--background` detaches it — logs to `~/.aweshare/producer.log`, pid to `producer.pid`; `--install` installs and starts a launchd/systemd service for boot auto-start and crash recovery) |
 | `aweshare producer reload` | signal the background producer (SIGHUP) to re-read `config.toml` + `secrets.json` and re-register its offerings on the open tunnel — no disconnect; a broken config keeps the previous values |
 | `aweshare producer refresh ALIAS [--add N] [--clear] [--json]` · `aweshare producer refresh --all [--json]` | reopen one of this producer's offerings mid-day, hub-side and effective at once (works even while the agent is stopped): bare call re-anchors today's window at this moment — usage before it stops counting; `--add N` raises today's cap by N tokens until Beijing midnight (replaces an earlier bonus); `--clear` drops both markers. Own offerings only; a permanent raise belongs in `dailyTokens`. `--all` bare-refreshes every registered offering with a daily cap in one run (unlimited ones are reported and skipped; one failure does not stop the rest) |
-| `aweshare producer stop` | stop the background producer (SIGTERM, SIGKILL after 10s) and clean up its pidfile |
+| `aweshare producer stop [--purge]` | stop the current producer run (SIGTERM, SIGKILL after 10s) and clean up its pidfile; `--purge` also removes an installed system service so it no longer auto-starts |
 
 **Consumer** — two commands, on the consumer's machine; day-to-day they point a standard SDK at the hub (see Consumer tool configuration):
 

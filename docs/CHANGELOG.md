@@ -48,11 +48,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 - Updated README and CHANGELOG guidance around `proxyUrl`, egress precedence, doctor output, and redaction behavior.
 
-## [Unreleased]
+## [0.6.7] - 2026-09-03
 
 ### Added
 
-- **Per-backend egress proxy (`proxyUrl`)** — a backend whose upstream needs a ladder (a Codex account login, or an `api.openai.com` key behind the same proxy) can now declare it in config: `proxyUrl = "http://127.0.0.1:7890"` inside its `[[backends]]` block. It covers that backend's http and https traffic only, hot-reloads with the config, and survives background/systemd starts where shell environment variables silently vanish. Precedence: `proxyUrl` over `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`; the env vars alone still apply to codex-login backends only (a machine-wide proxy setting can never capture a local Ollama). `NO_PROXY` is always honored; SOCKS or malformed URLs fail config load naming the backend. `producer doctor` gains a TCP reachability check for a configured proxy (the most common egress failure is the proxy itself being down) and names the active egress on the codex login check; proxy URLs are redacted in `producer config show` alongside tokens and never logged.
+- **Resident service for the producer (`start --install` / `stop --purge`)** — `aweshare producer start --install` registers a system service (launchd LaunchAgent on macOS, systemd user service on Linux): it starts now, auto-starts at login/boot, and restarts after a crash (launchd `KeepAlive`, systemd `Restart=on-failure`). `producer stop` ends the current run only — the service starts again on next boot; `stop --purge` stops it and removes the service entirely. Installing over a live background producer stops the old instance first; when a service is installed, bare `start` refuses with a pointer to `--install` / `stop --purge` (the service's own process is exempt, or launchd/systemd could never start it). Service-managed runs write their pid so `doctor`/`status` see them, and the instance line names `svc` vs `background` mode. Unsupported platforms fail loudly.
+
+### Fixed
+
+- **Mixed egress no longer thrashes the proxy dispatcher pool** — the per-backend egress route cache was a single slot: with one proxied and one direct backend, every request evicted (and closed) a pooled dispatcher another request might still be dispatching through (undici rejects with `UND_ERR_DESTROYED`). Routes are now cached per distinct proxy settings; a config reload calls `pruneProxyRoutes` to close only routes no backend references anymore, releasing their pooled sockets instead of leaking them for the life of the process.
+- **`egressNetworkHint` is now read-only** — building a doctor hint no longer creates (or closes) pooled proxy routes as a side effect.
+- **Service uninstall is robust** — `stop --purge` wraps the uninstall so a partial failure cannot block stopping the producer (messages report whether the service was removed or remains installed), and a failing `systemctl --user disable` (e.g. no user manager) no longer prevents the unit file's removal.
+- **Landing page footer no longer hardcodes a version** — the footer said `powered by aweshare v<version>` with the version baked into the hub binary, going stale the moment a new release shipped; it now reads `powered by aweshare`.
+
+## [Unreleased]
 
 ## [0.6.2] - 2026-08-31
 

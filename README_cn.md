@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.5-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.7-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -159,6 +159,11 @@ aweshare producer doctor
 aweshare producer start            # 前台运行；加 --background 转入后台
 #    后台实例用 'aweshare producer doctor --status' 查看，
 #    用 'aweshare producer stop' 停止
+#    或安装系统服务：现在即启动、开机自动启动、崩溃自动拉起
+#    （macOS launchd / Linux systemd user service）：
+aweshare producer start --install
+#    'producer stop' 只停本次；下次开机仍会自启。
+#    'producer stop --purge' 同时永久取消自启。
 ```
 
 #### 3. 消费者首跑（按顺序）
@@ -357,10 +362,10 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare producer list [offerings] [--json] [--all]` | 查看本 producer 在 hub 上注册了什么——别名、协议、实时状态、限额、即时占用（`IN USE`，此刻在用的不同消费者数）、当日 token 用量——外加本地后台实例状态与和 config.toml 的漂移（hubUrl/token 取自 config.toml）；`--all`：全部 producer 的注册情况（发现视图） |
 | `aweshare producer list usage [--details] [--consumer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了本 producer 的模型（producer 令牌把 hub 计量限定在自己那份）：默认按 消费者 × 模型 聚合，最近使用的在最上面（`--sort` 换排序），窗口默认 7d · `--details`：逐请求日志，新在前，每行标明消费者 |
 | `aweshare producer status` | 一眼摘要：本地进程、配置计数、已注册模型健康汇总与漂移——完整表格看 `list offerings` |
-| `aweshare producer start [--background]` | 连接并转发（长驻进程；`--background` 转入后台——日志写 `~/.aweshare/producer.log`，pid 写 `producer.pid`） |
+| `aweshare producer start [--background \| --install]` | 连接并转发（长驻进程；`--background` 转入后台——日志写 `~/.aweshare/producer.log`，pid 写 `producer.pid`；`--install` 安装并启动 launchd/systemd 服务，支持开机自启和崩溃拉起） |
 | `aweshare producer reload` | 通知后台 producer（SIGHUP）重读 `config.toml` + `secrets.json`，并在既有隧道上重新注册 offerings——不断连；配置有误时保留旧值继续服务 |
 | `aweshare producer refresh ALIAS [--add N] [--clear] [--json]` · `aweshare producer refresh --all [--json]` | 当日中途重开本 producer 的某个模型，hub 侧即时生效（producer 停着也能用）：裸调用把今日窗口重新起算——之前的用量不再计数；`--add N` 把今日上限提高 N 个 token 直到北京时间午夜（替换早前的加成）；`--clear` 清掉两个标记。仅限自己的模型，永久调高请改 `dailyTokens`（热加载）。`--all` 一条命令裸刷新全部有日限额的注册模型（无限额的会提示跳过；单个失败不中断其余） |
-| `aweshare producer stop` | 停止后台 producer（SIGTERM，10 秒后 SIGKILL）并清理 pidfile |
+| `aweshare producer stop [--purge]` | 停止当前 producer（SIGTERM，10 秒后 SIGKILL）并清理 pidfile；`--purge` 同时移除已安装的系统服务，使其不再开机自启 |
 
 **消费者侧**——两条命令，跑在消费者机器上；日常使用时标准 SDK 直连 hub（见「消费工具配置」）：
 
