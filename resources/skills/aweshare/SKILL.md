@@ -246,8 +246,8 @@ docker pull ghcr.io/wehuman01/aweshare:latest    # or plain docker: stop/rm + re
 
 Rules of thumb:
 - Update the hub first (it is the public entry point), then producer agents. Agents redial automatically after a hub restart (reverse tunnel, latest-wins); consumers see 503 only during the brief restart window.
-- Config changes hot-reload — no restart: both processes stat-poll their config files every 2s and apply valid edits within a couple of seconds; `aweshare producer reload` (SIGHUP to either process) forces it immediately, skipping only the polling delay. A broken file keeps the previous values; host/port and connection identity (`hubUrl`/`token`) still need a restart. Restart is also needed for CLI updates on that machine (background instances: `producer stop`, then `start --background` again).
-- The CLI prints a passive update reminder at most once per 24h; disable with `AWESHARE_NO_UPDATE_CHECK=1`.
+- Config changes hot-reload — no restart: both processes stat-poll their config files every 2s and apply valid edits within a couple of seconds; `aweshare producer reload` (SIGHUP to either process) forces it immediately, skipping only the polling delay. A broken file keeps the previous values; host/port and connection identity (`hubUrl`/`token`) still need a restart. Restart is also needed for CLI updates on that machine (background instances: `producer stop`, then `start --background` again; installed services: `producer stop --purge`, then `start --install` — npm replaces the files in place while the running process keeps the old code).
+- The CLI prints a passive update reminder at most once per 24h; disable with `AWESHARE_NO_UPDATE_CHECK=1`. The reminder and a successful `self-update` also nudge refreshing this skill: `aweskill update aweshare` for aweskill installs, re-copy per README.ai.md for direct copies.
 
 If the installed `aweshare` doesn't match what the user expects from the repository:
 

@@ -3,6 +3,12 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.6.8] - 2026-09-04
+
+### Added
+
+- **Invite expiry extension** — `aweshare hub admin invite extend N --expires-in D|none` resets a pending invite's expiry from now, or updates both a redeemed invite and the producer/consumer token it minted. Extending a previously expired token makes it usable again; manual suspension remains in force until restored.
+
 ## [0.6.3] - 2026-08-31
 
 ### Added
@@ -62,6 +68,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **Landing page footer no longer hardcodes a version** — the footer said `powered by aweshare v<version>` with the version baked into the hub binary, going stale the moment a new release shipped; it now reads `powered by aweshare`.
 
 ## [Unreleased]
+
+### Changed
+
+- **The update reminder now nudges a skill refresh** — the once-per-24h passive reminder and a successful `self-update` both append one line telling the user to refresh the aweshare agent skill (`aweskill update aweshare`; direct-copy installs re-copy per README.ai.md), so agent-side docs track the CLI instead of drifting after upgrades.
+
+### Added
+
+- **Docs now cover the post-upgrade steps for installed producers and the skill** — a producer installed with `start --install` keeps running the old CLI after an upgrade (the launchd/systemd unit pins absolute node/cli.js paths, npm replaces the files in place, so only a process restart loads the new code): `producer stop --purge` + `producer start --install` switches immediately, a reboot or crash-restart works too. Both READMEs, README.ai.md and the bundled skill now say so.
 
 ## [0.6.2] - 2026-08-31
 

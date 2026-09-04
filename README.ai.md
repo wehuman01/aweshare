@@ -50,6 +50,8 @@ Expected output: a version number (e.g. `0.4.8`).
 
 Install the skill so the agent can operate aweshare in this and future sessions. Choose one of the following options.
 
+If the skill is already installed, update it instead of skipping: `aweskill update aweshare` (Option A) or re-run the copy in Option B. A stale skill documents old behavior after a CLI upgrade — the CLI's update reminder mentions this too.
+
 ### Option A: Via aweskill (recommended if aweskill is available)
 
 Use this option if the user already has aweskill installed, or is willing to install it. This gives full skill management — install, update, projection, backup.

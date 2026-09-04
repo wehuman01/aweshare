@@ -70,6 +70,8 @@
 
 已发布：npm 包 [`aweshare`](https://www.npmjs.com/package/aweshare)（需 Node ≥ 22）和 Docker 镜像（`ghcr.io/wehuman01/aweshare`），无需 clone 源码。
 
+**平台支持：** macOS 与 Linux 完整支持。Windows 上 hub、consumer 和 producer 基本功能均可使用（CI 有覆盖），但有两点限制：`producer start --install` 在 Windows 上没有等价实现（请用 `--background`）；`producer reload` 在 Windows 上不发信号——配置变更本来就会在几秒内自动生效，另外停止后台 producer 是立即终止而非优雅退出（SIGHUP/SIGTERM 在 Windows 上无条件终止进程）。
+
 ### 让 AI agent 代装
 
 在 Claude Code、Codex 或其他编程 agent 里，对它说：
@@ -375,7 +377,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json] [--ping] [--alias a,b]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额、即时占用、当日剩余 token，以及 LAST SEEN——hub 的新鲜度证据（多久之前真实流量或恢复探测最后一次证实该 offering 服务过；`-` = 从未）。`--ping` 附上消费者自己的实测：对每个 offering 行发一次最小真实模型请求（SDK 同构，`max_tokens:1`，走同一批 `/v1` 端点），报告 RESULT、往返 TIME 与上游自报模型——FAIL 原样透传 hub/上游错误。真实调用消耗生产者配额，用 `--alias` 缩小范围；hub 按完整 `--ping` 循环计每日预算（默认每消费者 10 次，`consumerProbeBudget`），不按行计；任一实测失败退出码为 1（不带 `--ping` 恒为 0） |
 
-CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。
+CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。升级后两步跟进：装成系统服务的 producer 要 `aweshare producer stop --purge` + `aweshare producer start --install` 重装一次才用上新版（原因见「升级」）；aweshare skill 用 `aweskill update aweshare` 同步刷新（直拷安装的按 README.ai.md 重拷一份），agent 侧文档才跟得上。
 
 ## 运维
 
@@ -407,7 +409,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 
 模型诚实：offering 的 `upstreamModel` 只是 producer 的声明——hub 把它与每个成功响应报告的模型 id（`model` / `message.model` / `response.model`）比较。这是声明一致性证据，不是底层模型权重的身份证明：producer 或上游路由器仍可能改写这段元数据。观测复用现有用量计量通道，不改写转发响应，并严格限定在同一 alias、protocol 和当前声明；结果通过 `OBSERVED MODEL`、`list usage --details` 以及 `/v1/catalog` 的 `observedModel`、`observedAt`、`modelMatch` 和兼容字段 `modelVerified` 展示。catalog 还携带 `hubCheckAt`——该观测与服务端心跳上报的最近一次成功中较新者——渲染为 LAST SEEN 列：hub 的证据显示该 offering 上一次实际服务是多久前（`-` = 从未）。比对保留 token 边界：完全一致和明确日期/revision 后缀算肯定证据，允许厂商前缀；`gpt-4`/`gpt-4o`、`gpt-4o`/`gpt-4o-mini` 等相邻型号判为不符；响应只给出更宽泛型号时显示 `?`/`insufficient`，不算验证通过。处置仍分层：默认**只报告**，运营者可手动封 alias 或吊销整个 producer，也可选择连续 2 次不符后自动封禁；手动封禁优先于自动封禁。`producer doctor` 会探测每个不同的配置模型，并按同样的证据边界报告响应自报 id。
 
-升级 npm 安装：`aweshare self-update`（安装前会确认；`--check` 只看版本不改动）。npm 上有新版本时，CLI 每天最多提醒一次。
+升级 npm 安装：`aweshare self-update`（安装前会确认；`--check` 只看版本不改动）。npm 上有新版本时，CLI 每天最多提醒一次，提醒会同时提示刷新 aweshare skill。装成系统服务（`--install`）的 producer 不会热换新版：服务把 node 与 cli.js 的绝对路径写死，npm 升级是原地替换文件、路径不变，运行中的进程要等重启才加载新代码——`aweshare producer stop --purge` + `aweshare producer start --install` 立即换新，重启机器或崩溃拉起同样生效。aweshare skill 用 `aweskill update aweshare` 刷新（直拷安装的按 README.ai.md 重拷一份），agent 侧的操作文档才跟得上 CLI。
 
 升级 Docker 部署：`docker compose pull && docker compose up -d`。数据都在 `./data` 卷里不受影响；重启期间 producer 会自动重连，consumer 只在短暂的重启窗口内看到 503。
 
