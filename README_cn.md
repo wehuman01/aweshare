@@ -276,6 +276,8 @@ maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并�
 
 `maxConcurrencyPerUser` 限的是每个消费者的并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——某消费者要并发发 5 个请求需要自己的 `maxConcurrencyPerUser ≥ 5`；该别名的总并发理论上限是 `maxConcurrentUsers × maxConcurrencyPerUser`。日额度统计已记录用量（见下文「诚实的限制」）。（v0.4.3 由 `maxConcurrency` 改名而来，旧键限的是别名总并发。）
 
+**上游 5xx 处理**（`degradeOn5xx`）：5xx 只说明上游在失败，说明不了会失败多久——所以先报告、后执法。连续 2 次 5xx 把 backend 标为 `unstable`，出现在所有 offering 表格里（始终开启）：别名保持列出、派发继续，消费者在看到原样透传的上游错误之余多一个预警。设置 `degradeOn5xx = true`（producer config.toml 顶层键，热重载；hub 自托管模型在 config.produce.toml 用同名键）即可升级：连续第 3 次 5xx 真正降级——停止派发并返回 503 `BACKEND_DEGRADED`，30s 探测在首次成功后自动恢复。单次 5xx 是噪音（不触发任何状态）；任何一次成功都会清零计数；4xx 和网络错误永不进梯子（请求侧的问题不代表服务侧的健康）。探测是真实的最小请求，opt-in 后降级中的别名在等待恢复期间会消耗少量配额。
+
 密钥卫生：用专用最小权限、可撤销、带预算告警的 key；`secrets.json` 保持 0600、不进 git/截图；疑似泄露立即轮换。共享权利自查：账号条款、订阅限制、转发与商用约束。
 
 **账号登录型 backend**（`login = "codex"`）不用 key，而是用生产者本机的 `codex login` 做认证——固定官方上游为 `https://chatgpt.com/backend-api/codex`，使用 responses 线协议；其他协议或 base URL 会被拒绝，避免账户凭据被发往别处。行为要点：
@@ -374,7 +376,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | 命令 | 用途 |
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list invites --token` 找回） |
-| `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
+| `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded/unstable 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json] [--ping] [--alias a,b]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额、即时占用、当日剩余 token，以及 LAST SEEN——hub 的新鲜度证据（多久之前真实流量或恢复探测最后一次证实该 offering 服务过；`-` = 从未）。`--ping` 附上消费者自己的实测：对每个 offering 行发一次最小真实模型请求（SDK 同构，`max_tokens:1`，走同一批 `/v1` 端点），报告 RESULT、往返 TIME 与上游自报模型——FAIL 原样透传 hub/上游错误。真实调用消耗生产者配额，用 `--alias` 缩小范围；hub 按完整 `--ping` 循环计每日预算（默认每消费者 10 次，`consumerProbeBudget`），不按行计；任一实测失败退出码为 1（不带 `--ping` 恒为 0） |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。升级后两步跟进：装成系统服务的 producer 要 `aweshare producer stop --purge` + `aweshare producer start --install` 重装一次才用上新版（原因见「升级」）；aweshare skill 用 `aweskill update aweshare` 同步刷新（直拷安装的按 README.ai.md 重拷一份），agent 侧文档才跟得上。
@@ -405,7 +407,7 @@ hub 会从数据目录读取 `config.toml`（`~/.aweshare-hub/config.toml`；Doc
 | `AWESHARE_NO_UPDATE_CHECK` | 未设置 | 设为 `1` 关闭被动更新提醒 |
 | `AWESHARE_TIMEZONE` | `Asia/Shanghai` | CLI 打印的所有给人看的时间（表格单元、`since …` 窗口、日志行）的显示时区，接受任意 IANA 名称；线上传输、SQLite 与 `--json` 仍是 UTC ISO。由实际渲染的 CLI 读取，对 `docker exec` 同样生效——改容器上的该变量即可改变 `hub list`/`hub status` 输出。非服务端参数：不走 SIGHUP 热加载，也没有 config.toml 键 |
 
-健康：Agent 心跳 15s，静默 45s 判死；后端 AUTH/QUOTA 连败 2 次自动降级（别名对消费者显示 degraded，停止派发），30s 探测恢复。同一生产者令牌新连接替换旧连接（latest-wins）。
+健康：Agent 心跳 15s，静默 45s 判死；后端 AUTH/QUOTA 连败 2 次自动降级（别名对消费者显示 degraded，停止派发），30s 探测恢复；上游 5xx 连败 2 次显示 unstable（派发继续），第 3 次仅在开启 `degradeOn5xx` 后才降级。同一生产者令牌新连接替换旧连接（latest-wins）。
 
 模型诚实：offering 的 `upstreamModel` 只是 producer 的声明——hub 把它与每个成功响应报告的模型 id（`model` / `message.model` / `response.model`）比较。这是声明一致性证据，不是底层模型权重的身份证明：producer 或上游路由器仍可能改写这段元数据。观测复用现有用量计量通道，不改写转发响应，并严格限定在同一 alias、protocol 和当前声明；结果通过 `OBSERVED MODEL`、`list usage --details` 以及 `/v1/catalog` 的 `observedModel`、`observedAt`、`modelMatch` 和兼容字段 `modelVerified` 展示。catalog 还携带 `hubCheckAt`——该观测与服务端心跳上报的最近一次成功中较新者——渲染为 LAST SEEN 列：hub 的证据显示该 offering 上一次实际服务是多久前（`-` = 从未）。比对保留 token 边界：完全一致和明确日期/revision 后缀算肯定证据，允许厂商前缀；`gpt-4`/`gpt-4o`、`gpt-4o`/`gpt-4o-mini` 等相邻型号判为不符；响应只给出更宽泛型号时显示 `?`/`insufficient`，不算验证通过。处置仍分层：默认**只报告**，运营者可手动封 alias 或吊销整个 producer，也可选择连续 2 次不符后自动封禁；手动封禁优先于自动封禁。`producer doctor` 会探测每个不同的配置模型，并按同样的证据边界报告响应自报 id。
 

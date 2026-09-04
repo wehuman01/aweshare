@@ -3,6 +3,14 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.6.9] - 2026-09-04
+
+### Added
+
+- **`unstable` — the report-only middle state for upstream 5xx**: two consecutive upstream 5xx mark the backend `unstable` in every offering table (`consumer list`, `hub list offerings`, `producer list`, `/v1/catalog`). Dispatch continues and errors keep passing through verbatim — it is the early warning that previously only showed as an aging LAST SEEN. A single 5xx stays noise; any success resets the count. Heartbeats report the new state (old hubs render it as online), and `producer doctor` now names upstream 5xx ("the upstream itself is failing") instead of hinting at a wrong model id.
+
+- **`degradeOn5xx` — opt-in enforcement for persistent 5xx**: with `degradeOn5xx = true` in the producer's config.toml (top-level, hot-reloads; same key in the hub's config.produce.toml for hub-hosted models), the third consecutive upstream 5xx degrades the backend for real — dispatch stops with 503 `BACKEND_DEGRADED` and the 30s recovery probes restore it on the first success. Off by default: a 5xx is a symptom, not a verdict, so by default it only reports. Upstream failures now classify as `SERVER` (5xx) vs `HTTP` (other 4xx); 4xx and network errors never touch the ladder.
+
 ## [0.6.8] - 2026-09-04
 
 ### Added
