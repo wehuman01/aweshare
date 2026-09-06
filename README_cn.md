@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.6.7-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.0-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -377,6 +377,7 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 |---|---|
 | `aweshare consumer join --hub URL --code asi_… [--allow-http]` | 兑换消费码得到 `asc_` 令牌——只打印一次，附可直接粘贴的 SDK 环境变量（当场保存；运维者可用 `hub list invites --token` 找回） |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json]` | hub 发现视图：默认只列在线的 offering（degraded/unstable 仍显示；`--all` 连 offline 一起列）——全部生产者、别名、协议、状态、按别名的限额、即时占用（`IN USE n/max`——此刻有请求在途的不同消费者数；`max/max` 的别名在有人结束前不再放新消费者进）及当日剩余 token |
+| `aweshare consumer list --hub URL --token asc_… [--all] [--alias a,b] --watch · --refresh N` | 实时监视：普通的发现视图按间隔原地重绘——`--watch` 每 60 秒，`--refresh N[s\|m\|h]` 自定义间隔（下限 5 秒，别把轮询压到 hub 上；它本身就意味着 `--watch`），标题行带每次刷新的时间戳。仅限终端（stdout 不是 TTY 会报错并提示）；Ctrl+C 干净退出、退出码 0。有意只支持免费视图：`--ping` 消耗生产者配额和探测预算，保持手动按需的一次性操作，与 watch 组合会直接报错；`--json` 同样拒绝——脚本按自己的节奏轮询即可。某次刷新失败（hub 或网络抖动）会把错误显示在画面里，watch 继续运行 |
 | `aweshare consumer list --hub URL --token asc_… [--all] [--json] [--ping] [--alias a,b]` | hub 发现视图：全部生产者、别名、协议、状态、按别名的限额、即时占用、当日剩余 token，以及 LAST SEEN——hub 的新鲜度证据（多久之前真实流量或恢复探测最后一次证实该 offering 服务过；`-` = 从未）。`--ping` 附上消费者自己的实测：对每个 offering 行发一次最小真实模型请求（SDK 同构，`max_tokens:1`，走同一批 `/v1` 端点），报告 RESULT、往返 TIME 与上游自报模型——FAIL 原样透传 hub/上游错误。真实调用消耗生产者配额，用 `--alias` 缩小范围；hub 按完整 `--ping` 循环计每日预算（默认每消费者 10 次，`consumerProbeBudget`），不按行计；任一实测失败退出码为 1（不带 `--ping` 恒为 0） |
 
 CLI 维护：`aweshare self-update [--check]` 更新 npm 安装的 CLI（`--check` 只比较版本）。升级后两步跟进：装成系统服务的 producer 要 `aweshare producer stop --purge` + `aweshare producer start --install` 重装一次才用上新版（原因见「升级」）；aweshare skill 用 `aweskill update aweshare` 同步刷新（直拷安装的按 README.ai.md 重拷一份），agent 侧文档才跟得上。

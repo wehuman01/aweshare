@@ -3,6 +3,16 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.7.0] - 2026-09-06
+
+### Added
+
+- **`consumer list --watch` — the live discovery monitor**: the free catalog view redrawn in place on an interval instead of a one-shot snapshot. `--watch` refreshes every 60s; `--refresh N[s|m|h]` sets a custom interval (floor 5s, gentle on the hub; implies `--watch`); the header line stamps each refresh. Terminal only (non-TTY stdout fails with a hint); Ctrl+C exits cleanly with code 0. The free view only, by design: `--ping` consumes producer quota and probe budget, so it stays a deliberate one-shot and combining the two fails loudly; `--json` is rejected too — scripts poll on their own schedule. A failed refresh (hub or network blip) becomes the frame's content and the watch keeps going; `--all`/`--alias` filters re-apply on every fetch.
+
+### Changed
+
+- **Token amounts render with thousands separators**: token columns and quota messages in every human-facing output now group digits with a fixed ',' (`1000000` → `1,000,000`) via a shared `fmtTokens` helper — locale-independent, so CLI output stays stable and diffable. `--json`, the wire and the SQLite rows keep raw integers.
+
 ## [0.6.9] - 2026-09-04
 
 ### Added
@@ -82,6 +92,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **The update reminder now nudges a skill refresh** — the once-per-24h passive reminder and a successful `self-update` both append one line telling the user to refresh the aweshare agent skill (`aweskill update aweshare`; direct-copy installs re-copy per README.ai.md), so agent-side docs track the CLI instead of drifting after upgrades.
 
 ### Added
+
+- **`consumer list --watch` / `--refresh N` — the discovery view as a live monitor**: the free catalog table redrawn in place on an interval instead of a hand-rolled `while/sleep` loop. `--watch` refreshes every 60s; `--refresh N[s|m|h]` sets a custom interval (floor 5s, so a monitor never becomes load; implies `--watch`). The header line stamps each refresh, Ctrl+C exits cleanly with code 0, and a failed refresh (hub or network blip) becomes the frame's content while the watch keeps going. Terminal only by design: non-TTY stdout fails with a hint, `--json` is rejected (scripts poll on their own schedule), and `--ping` is rejected — it consumes producer quota and probe budget, so it stays a deliberate one-shot rather than something an interval replays.
 
 - **Docs now cover the post-upgrade steps for installed producers and the skill** — a producer installed with `start --install` keeps running the old CLI after an upgrade (the launchd/systemd unit pins absolute node/cli.js paths, npm replaces the files in place, so only a process restart loads the new code): `producer stop --purge` + `producer start --install` switches immediately, a reboot or crash-restart works too. Both READMEs, README.ai.md and the bundled skill now say so.
 
