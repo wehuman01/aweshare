@@ -260,6 +260,10 @@ upstreamModel = "qwen2.5:7b"             # 必须是后端真实 ID（ollama lis
 maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并发请求数
 # maxConcurrentUsers = 3                 # 同时在用的不同消费者数（hub 默认 3）
 # dailyTokens = 1000000                  # 每日共享 token 额度（按北京时间日，默认 100 万；0 = 无上限）
+# shareWindows = ["00:00-06:00"]         # 共享时间窗——见下文
+# blockWindows = ["14:00-18:00"]         # 屏蔽清单写法（与 shareWindows 互斥）
+# shareDays = "everyday"                 # everyday | weekdays | weekend | today | tomorrow | [日期列表]
+# shareTimezone = "Asia/Shanghai"        # 默认取本机显示时区（AWESHARE_TIMEZONE）
 ```
 
 一条 offering 恰好暴露一个上游模型：消费者调用别名，hub 在转发前把请求里的 model 强制改写为 `upstreamModel`——他们永远无法选用其他模型。想多开放模型就多写几条 `[[offerings]]`。
@@ -275,6 +279,8 @@ maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并�
 | `dailyTokens` | 1000000 | 该别名每 **北京日**（UTC+8）跨消费者合计的 token（prompt+completion）额度；`0` = 无上限 | 429 `QUOTA_EXCEEDED`（北京时间午夜重置） |
 
 `maxConcurrencyPerUser` 限的是每个消费者的并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——某消费者要并发发 5 个请求需要自己的 `maxConcurrencyPerUser ≥ 5`；该别名的总并发理论上限是 `maxConcurrentUsers × maxConcurrencyPerUser`。日额度统计已记录用量（见下文「诚实的限制」）。（v0.4.3 由 `maxConcurrency` 改名而来，旧键限的是别名总并发。）
+
+**共享时间窗**（可选，写在同一个 `[[offerings]]` 块里，四个键出现任意一个即生效）：`shareWindows = ["00:00-06:00"]` 表示**只在**这些挂钟时段共享该别名；`blockWindows = ["14:00-18:00"]` 是屏蔽清单写法——两者互斥，只能设其一。`shareDays` 限定日历范围：`everyday`（默认）、`weekdays`、`weekend`、`today`、`tomorrow`（这两个在读取配置时就固化为具体日期——想明天继续开就明天再改一次文件）或显式日期列表如 `["2026-09-08", "2026-09-10"]`。`shareTimezone` 指定时窗所在的 IANA 时区；不设则默认取写配置这台机器的显示时区（`AWESHARE_TIMEZONE`，否则 Asia/Shanghai），解析时固化一次并随注册上传——无论 hub 自己的时钟在哪个时区，都按这个时区执行。起点晚于终点的时窗（`"22:00-06:00"`）跨午夜、归属起始日：`weekdays` 的 `22:00-06:00` 会开到周六凌晨，但周六晚上不开。只设日期不设时窗 = 匹配的日子全天共享。时窗之外 hub 返回 503 `SHARE_WINDOW_CLOSED`，并带精确到下一次开放时刻的 `Retry-After`；`consumer list`、`hub list offerings`、`producer list` 都有 SCHEDULE 列（`daily 00:00-06:00`、`weekdays !14:00-18:00`、`2026-09-08 all day`，未设置显示 `-`，关闭期间追加 `(closed)`）。时间窗和限额一样是配置：改动热加载生效，hub 自托管模型在 `config.produce.toml` 里写同一套键。
 
 **上游 5xx 处理**（`degradeOn5xx`）：5xx 只说明上游在失败，说明不了会失败多久——所以先报告、后执法。连续 2 次 5xx 把 backend 标为 `unstable`，出现在所有 offering 表格里（始终开启）：别名保持列出、派发继续，消费者在看到原样透传的上游错误之余多一个预警。设置 `degradeOn5xx = true`（producer config.toml 顶层键，热重载；hub 自托管模型在 config.produce.toml 用同名键）即可升级：连续第 3 次 5xx 真正降级——停止派发并返回 503 `BACKEND_DEGRADED`，30s 探测在首次成功后自动恢复。单次 5xx 是噪音（不触发任何状态）；任何一次成功都会清零计数；4xx 和网络错误永不进梯子（请求侧的问题不代表服务侧的健康）。探测是真实的最小请求，opt-in 后降级中的别名在等待恢复期间会消耗少量配额。
 

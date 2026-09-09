@@ -3,6 +3,18 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [0.7.1] - 2026-09-09
+
+### Added
+
+- **Share-time scheduling for offerings**: an offering may declare when it is shared, in the same `[[offerings]]` block as its caps — `shareWindows = ["00:00-06:00"]` (allow-list), `blockWindows = ["14:00-18:00"]` (deny-list, mutually exclusive with the former), `shareDays` (`everyday` default, `weekdays`, `weekend`, `today`, `tomorrow` — both frozen into concrete dates at config-parse time — or explicit `["2026-09-08"]` dates) and `shareTimezone` (IANA; default the writing machine's display zone, resolved once and sent with the registration). Windows are wall-clock in that zone; a start later than its end (`22:00-06:00`) crosses midnight and belongs to its start day; days-only schedules share all day on matching days. The hub gates admission centrally — outside the schedule it answers 503 `SHARE_WINDOW_CLOSED` with a `Retry-After` of the exact time until the next window, for remote producers and hub-hosted models alike (`config.produce.toml` takes the same keys). `consumer list`, `hub list offerings` and `producer list` gained a SCHEDULE column (`daily 00:00-06:00`, `weekdays !14:00-18:00`, `2026-09-08 all day`, `-` when unset, `(closed)` while shut), and `/v1/catalog` plus every `--json` output carry `schedule` and `shareState`. Config edits hot-reload; old hubs ignore the new fields and old agents simply register without a schedule.
+
+### Changed
+
+- **Unify relay handling and shared cap validation**: centralize the hub relay lifecycle in a shared BaseRelay so tunnel and local dispatch paths behave identically; extract per-offering cap parsing and degraded-backend probe logic into shared producer-core helpers
+
+## [Unreleased]
+
 ## [0.7.0] - 2026-09-06
 
 ### Added
