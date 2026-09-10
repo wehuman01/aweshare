@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.0-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.2-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -221,6 +221,26 @@ Claude Code 若残留旧 OAuth 登录态会覆盖环境变量配置，用 `/logi
 base_url = "https://hub.example.com/v1"
 ```
 
+**OpenCode**（`~/.config/opencode/opencode.json`；该 provider 两种 OpenAI 线协议都行——按上表选）
+
+```json
+{
+  "small_model": "aweshare/peng/flash-lite",
+  "provider": {
+    "aweshare": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "https://hub.example.com/v1", "apiKey": "asc_..." },
+      "models": {
+        "peng/qwen38": { "name": "peng/qwen38", "release_date": "2026-09-01" },
+        "peng/flash-lite": { "name": "peng/flash-lite", "release_date": "2026-09-01" }
+      }
+    }
+  }
+}
+```
+
+务必设置 `small_model`——否则会话标题请求会和你的第一条消息相撞：opencode 并发发出它，两个请求都计入该别名的 `maxConcurrencyPerUser`，默认值 1 会让标题请求变成 429 `PRODUCER_MAX_CONCURRENCY` 重试循环。不设置时 opencode 会从同一 provider 里自动挑小模型，但只有带了近期 `release_date`、且 id/名称命中其便宜关键词（`flash`/`lite`/`mini`/`nano`/`haiku`/`small`/`fast`）的自定义模型才合格——不写 `release_date` 的条目按 1970 年处理、永远不合格——一个合格候选都没有时就回落到主别名、照样撞上限。把 `small_model` 指向非 aweshare 的 provider 也可以。
+
 **发现可用模型**：`GET /v1/models`（OpenAI SDK `client.models.list()`）返回 hub 上已注册的全部别名及在线状态。
 
 ## 生产者配置参考（~/.aweshare/config.toml）
@@ -278,7 +298,7 @@ maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并�
 | `maxConcurrentUsers` | 3 | 该别名上同时有进行中请求的**不同消费者数**上限 | 429 `PRODUCER_MAX_USERS` |
 | `dailyTokens` | 1000000 | 该别名每 **北京日**（UTC+8）跨消费者合计的 token（prompt+completion）额度；`0` = 无上限 | 429 `QUOTA_EXCEEDED`（北京时间午夜重置） |
 
-`maxConcurrencyPerUser` 限的是每个消费者的并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——某消费者要并发发 5 个请求需要自己的 `maxConcurrencyPerUser ≥ 5`；该别名的总并发理论上限是 `maxConcurrentUsers × maxConcurrencyPerUser`。日额度统计已记录用量（见下文「诚实的限制」）。（v0.4.3 由 `maxConcurrency` 改名而来，旧键限的是别名总并发。）
+`maxConcurrencyPerUser` 限的是每个消费者的并发**请求数**，`maxConcurrentUsers` 限的是并发**人数**——某消费者要并发发 5 个请求需要自己的 `maxConcurrencyPerUser ≥ 5`；该别名的总并发理论上限是 `maxConcurrentUsers × maxConcurrencyPerUser`。面向编程 agent 的 offering 要留余量：opencode 会在主请求之外同时挂一个后台标题/摘要请求，所以这类别名上 `maxConcurrencyPerUser = 2` 是实际下限，除非消费者把 small model 指到别处（见「消费者工具配置」）。日额度统计已记录用量（见下文「诚实的限制」）。（v0.4.3 由 `maxConcurrency` 改名而来，旧键限的是别名总并发。）
 
 **共享时间窗**（可选，写在同一个 `[[offerings]]` 块里，四个键出现任意一个即生效）：`shareWindows = ["00:00-06:00"]` 表示**只在**这些挂钟时段共享该别名；`blockWindows = ["14:00-18:00"]` 是屏蔽清单写法——两者互斥，只能设其一。`shareDays` 限定日历范围：`everyday`（默认）、`weekdays`、`weekend`、`today`、`tomorrow`（这两个在读取配置时就固化为具体日期——想明天继续开就明天再改一次文件）或显式日期列表如 `["2026-09-08", "2026-09-10"]`。`shareTimezone` 指定时窗所在的 IANA 时区；不设则默认取写配置这台机器的显示时区（`AWESHARE_TIMEZONE`，否则 Asia/Shanghai），解析时固化一次并随注册上传——无论 hub 自己的时钟在哪个时区，都按这个时区执行。起点晚于终点的时窗（`"22:00-06:00"`）跨午夜、归属起始日：`weekdays` 的 `22:00-06:00` 会开到周六凌晨，但周六晚上不开。只设日期不设时窗 = 匹配的日子全天共享。时窗之外 hub 返回 503 `SHARE_WINDOW_CLOSED`，并带精确到下一次开放时刻的 `Retry-After`；`consumer list`、`hub list offerings`、`producer list` 都有 SCHEDULE 列（`daily 00:00-06:00`、`weekdays !14:00-18:00`、`2026-09-08 all day`，未设置显示 `-`，关闭期间追加 `(closed)`）。时间窗和限额一样是配置：改动热加载生效，hub 自托管模型在 `config.produce.toml` 里写同一套键。
 

@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.0-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.2-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -222,6 +222,26 @@ If Claude Code has a stale OAuth login it overrides env config — switch with `
 base_url = "https://hub.example.com/v1"
 ```
 
+**OpenCode** (`~/.config/opencode/opencode.json`; the provider speaks both OpenAI wires — pick per the table above)
+
+```json
+{
+  "small_model": "aweshare/peng/flash-lite",
+  "provider": {
+    "aweshare": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "https://hub.example.com/v1", "apiKey": "asc_..." },
+      "models": {
+        "peng/qwen38": { "name": "peng/qwen38", "release_date": "2026-09-01" },
+        "peng/flash-lite": { "name": "peng/flash-lite", "release_date": "2026-09-01" }
+      }
+    }
+  }
+}
+```
+
+Set `small_model` — otherwise the session-title request collides with your first message: opencode fires it concurrently, both count against the alias's `maxConcurrencyPerUser`, and the default 1 turns the title call into a 429 `PRODUCER_MAX_CONCURRENCY` retry loop. Left unset, opencode auto-picks a small model from the same provider, but only custom models carrying a recent `release_date` and an id/name matching its cheap keywords (`flash`/`lite`/`mini`/`nano`/`haiku`/`small`/`fast`) are eligible — entries without `release_date` read as 1970 and never qualify — and with no eligible candidate it falls back to the main alias and hits the cap anyway. Pointing `small_model` at any non-aweshare provider works too.
+
 **Discovering models**: `GET /v1/models` (OpenAI SDK `client.models.list()`) returns every alias registered on the hub, with online status.
 
 ## Producer config reference (~/.aweshare/config.toml)
@@ -279,7 +299,7 @@ One alias can also speak several wire protocols at once: replace `backend = "…
 | `maxConcurrentUsers` | 3 | distinct consumers with a request in flight on this alias | 429 `PRODUCER_MAX_USERS` |
 | `dailyTokens` | 1000000 | tokens (prompt + completion) shared across all consumers on this alias, per Beijing day (UTC+8); `0` = unlimited | 429 `QUOTA_EXCEEDED` (resets at Beijing midnight) |
 
-`maxConcurrencyPerUser` caps each consumer's in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a consumer firing 5 parallel requests needs `maxConcurrencyPerUser ≥ 5` for itself alone, while the total on the alias is bounded by `maxConcurrentUsers × maxConcurrencyPerUser`. Daily caps count recorded usage (see "Honest limits" below). (Renamed in v0.4.3 from `maxConcurrency`, which capped the alias's total in-flight requests.)
+`maxConcurrencyPerUser` caps each consumer's in-flight **requests**; `maxConcurrentUsers` caps in-flight **people** — a consumer firing 5 parallel requests needs `maxConcurrencyPerUser ≥ 5` for itself alone, while the total on the alias is bounded by `maxConcurrentUsers × maxConcurrencyPerUser`. Coding agents need headroom here: opencode keeps a background title/summary request in flight next to the main one, so on offerings meant for such agents `maxConcurrencyPerUser = 2` is the practical floor unless consumers route their small model elsewhere (see Consumer tool configuration). Daily caps count recorded usage (see "Honest limits" below). (Renamed in v0.4.3 from `maxConcurrency`, which capped the alias's total in-flight requests.)
 
 **Share-time scheduling** (optional, same `[[offerings]]` block; any of the four keys turns it on): `shareWindows = ["00:00-06:00"]` shares the alias **only** inside those wall-clock windows, `blockWindows = ["14:00-18:00"]` is the deny-list alternative — set one or the other, never both. `shareDays` scopes the calendar: `everyday` (default), `weekdays`, `weekend`, `today`, `tomorrow` (both freeze into concrete dates when the config is read — edit the file again tomorrow for another one-day window) or explicit dates like `["2026-09-08", "2026-09-10"]`. `shareTimezone` names the IANA zone the windows live in; unset it defaults to the writing machine's display zone (`AWESHARE_TIMEZONE`, else Asia/Shanghai), resolved once at parse time and sent with the registration — the hub enforces it however its own clock is set. A window whose start is later than its end (`"22:00-06:00"`) crosses midnight and belongs to its start day, so `weekdays`-scheduled `22:00-06:00` stays open into Saturday's small hours but not Saturday night. Days-only schedules (no windows) share all day on matching days. Outside the schedule the hub answers 503 `SHARE_WINDOW_CLOSED` with a `Retry-After` of the exact time until the next window; `consumer list`, `hub list offerings` and `producer list` show a SCHEDULE column (`daily 00:00-06:00`, `weekdays !14:00-18:00`, `2026-09-08 all day`, `-` when unset, `(closed)` while shut). Schedules are config like the caps — hot-reload edits them, and hub-hosted models set the same keys in `config.produce.toml`.
 

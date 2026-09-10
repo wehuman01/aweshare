@@ -204,6 +204,7 @@ After config edits on a running producer, `aweshare producer reload` applies the
    export OPENAI_BASE_URL=https://hub.example.com/v1
    export OPENAI_API_KEY=asc_...
    ```
+   OpenCode consumers: also set `small_model` in `~/.config/opencode/opencode.json` (a cheap alias or any non-aweshare provider). opencode fires a background title request alongside the first message; on an alias with `maxConcurrencyPerUser = 1` it gets 429 `PRODUCER_MAX_CONCURRENCY` and retries. Custom opencode model entries need a recent `release_date` (and a flash/lite/mini-style id) for opencode's automatic small-model pick to find them.
 3. Discovery (read-only, safe to run once you have the token):
    ```bash
    aweshare consumer list --hub https://hub.example.com --token asc_...

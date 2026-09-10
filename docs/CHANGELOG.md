@@ -13,6 +13,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 - **Unify relay handling and shared cap validation**: centralize the hub relay lifecycle in a shared BaseRelay so tunnel and local dispatch paths behave identically; extract per-offering cap parsing and degraded-backend probe logic into shared producer-core helpers
 
+## [0.7.2] - 2026-09-10
+
+### Added
+
+- **Shared invite names across roles**: invite names are now unique only within a role, not globally across producer/consumer tables. A consumer invite may reuse a producer name without clashing, and the redeem flow no longer checks the opposite table.
+
+### Documentation
+
+- **OpenCode consumer setup**: document the `small_model` configuration needed to avoid `429 PRODUCER_MAX_CONCURRENCY` retry loops when OpenCode fires its session-title request on an alias with `maxConcurrencyPerUser = 1`.
+
 ## [Unreleased]
 
 ## [0.7.0] - 2026-09-06
