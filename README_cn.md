@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.2-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.3-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -271,6 +271,7 @@ id = "codex-account"
 protocol = "responses"
 baseUrl = "https://chatgpt.com/backend-api/codex"
 login = "codex"                          # 用本机 CLI 登录代替 key；与 keyRef 互斥
+# loginHome = "~/.config/aweswitch/accounts/codex/cxo-second"  # 另一个登录的目录；默认 ~/.codex
 # proxyUrl = "http://127.0.0.1:7890"     # 该后端的出口代理（任何后端都可设置）
 
 [[offerings]]
@@ -309,6 +310,7 @@ maxConcurrencyPerUser = 1                # 单个消费者在该别名上的并�
 **账号登录型 backend**（`login = "codex"`）不用 key，而是用生产者本机的 `codex login` 做认证——固定官方上游为 `https://chatgpt.com/backend-api/codex`，使用 responses 线协议；其他协议或 base URL 会被拒绝，避免账户凭据被发往别处。行为要点：
 
 - 登录凭据读自 `${CODEX_HOME|~/.codex}/auth.json`，只存在于生产者进程内存；文件变化或请求返回 401 时自动重读——生产者重新 `codex login` 后无需重启。secrets.json 里没有它的条目。
+- **多个登录并行（`loginHome`）**：给每个 codex 登录后端指定自己的 `loginHome`——CODEX_HOME 风格的目录（绝对路径，支持开头 `~` 展开），`auth.json` 就在其中。一个生产者即可同时共享两个账号；各后端独立读取、独立重读自己的文件，`producer doctor` 也会分别报告每个登录。各账号的 token 仍只在其登录所在处刷新（比如偶尔跑一下第二个账号的 CLI 会话）；闲置过期的登录只会让自己的别名降级。
 - 生产者注入 Codex CLI 自己携带的原生请求头，强制 `store: false`，并删除部分 Responses SDK 会发送、但 chatgpt 后端拒绝的 `max_output_tokens`。
 - **出口代理（`proxyUrl`）**：上游必须走代理才可达时（如本地 Clash 的 `http://127.0.0.1:7890`），在后端块里直接设 `proxyUrl`——任何后端都行，不限于账号登录（同样要梯子的 `api.openai.com` key 后端也算）。它只作用于该后端的 http/https 流量，随配置热重载，后台/开机自启场景也不会丢——shell 环境变量在这些场景会静默消失。优先级：`proxyUrl` > `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`；仅有环境变量时依旧只对 codex 登录后端生效，机器级代理设置绝不会截走本地 Ollama。`NO_PROXY` 始终生效；SOCKS 在配置加载时即被拒绝。`producer doctor` 会对配置的代理做 TCP 探测，代理没开直接报红；代理 URL 可能携带凭据，`producer config show` 中脱敏显示、绝不写日志。
 - 消费端只支持 `/v1/responses`：Codex CLI（默认 `wire_api`）、opencode（`@ai-sdk/openai`）、Cline（OpenAI Native）。chat-completions 工具和 Claude Code 用不了这类 offering。

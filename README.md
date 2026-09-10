@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.2-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.3-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -272,6 +272,7 @@ id = "codex-account"
 protocol = "responses"
 baseUrl = "https://chatgpt.com/backend-api/codex"
 login = "codex"                          # account auth instead of a key; exclusive with keyRef
+# loginHome = "~/.config/aweswitch/accounts/codex/cxo-second"  # another login's dir; default ~/.codex
 # proxyUrl = "http://127.0.0.1:7890"     # egress proxy for this backend (any backend may set one)
 
 [[offerings]]
@@ -312,6 +313,7 @@ Key hygiene: use dedicated, least-privilege, revocable keys with budget alerts; 
 **Account-login backends** (`login = "codex"`) authenticate with the producer machine's own `codex login` instead of a key — the fixed official upstream is `https://chatgpt.com/backend-api/codex`, responses wire. Other protocols or base URLs are rejected so the account credential cannot be sent elsewhere. How it behaves:
 
 - The login is read from `${CODEX_HOME|~/.codex}/auth.json`, stays in producer memory only, and is re-read whenever the file changes or a request comes back 401 — so a fresh `codex login` on the producer machine is picked up without a restart. No secrets.json entry exists for it.
+- **Several logins side by side (`loginHome`)**: give each codex-login backend its own `loginHome` — the CODEX_HOME-style dir (absolute, leading `~` expanded) that holds `auth.json`. One producer can then share two accounts at once; each backend reads and re-reads its own file, and `producer doctor` reports each login separately. Each account's tokens still refresh only where that login lives (e.g. run the second account's CLI session occasionally); an idle expired login degrades only its own aliases.
 - The producer injects the headers the Codex CLI itself sends, forces `store: false`, and removes `max_output_tokens` emitted by some Responses SDKs (the chatgpt backend rejects it).
 - **Egress proxy (`proxyUrl`)**: when the upstream is only reachable through a proxy (e.g. a ladder such as Clash on `http://127.0.0.1:7890`), set `proxyUrl` on the backend — any backend, not just account logins (an `api.openai.com` key behind the same ladder qualifies). It covers that backend's http and https traffic only, hot-reloads with the config, and survives background/systemd starts, where shell environment variables silently vanish. Precedence: `proxyUrl` beats `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`; the env vars alone still apply to codex-login backends only, so a machine-wide proxy setting can never capture a local Ollama. `NO_PROXY` is always honored; SOCKS is rejected at config load. `producer doctor` TCP-probes a configured proxy and fails loudly when it is down, and proxy URLs are redacted in `producer config show` (they can carry credentials) and never logged.
 - Consumers must speak `/v1/responses`: Codex CLI (default `wire_api`), opencode (via `@ai-sdk/openai`), Cline (OpenAI Native provider). Chat-completions tools and Claude Code cannot use these offerings.

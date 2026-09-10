@@ -3,6 +3,19 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
+## [Unreleased]
+
+## [0.7.3] - 2026-09-10
+
+### Added
+
+- **`loginHome` — several codex logins on one producer**: a codex-login backend may set `loginHome` to the CODEX_HOME-style dir (absolute, leading `~` expanded) whose `auth.json` it reads; the default stays `CODEX_HOME` / `~/.codex`, so existing configs are untouched. Two backends with different `loginHome` values share two accounts side by side — each reads, caches (mtime/size) and 401-invalidates its own file, and `producer doctor` reports each login separately (naming its dir). The key is rejected at config load when it is relative, empty, or sits on a backend without `login = "codex"`. Tokens still refresh only where each login lives; an idle expired login degrades only its own aliases.
+
+### Fixed
+
+- **Admission no longer leaks on exceptional relay paths**: `handleInference` now settles through `finalize()` on every exit after admission — a config hot-reload racing `local.openRequest` (its anticipated 503) and a `writeHead` failure on the response head both previously skipped the release of the consumer's inflight slot and the alias's concurrency/user slots, permanently holding them until a hub restart.
+- **`response.head` is validated at the boundary**: a status outside integer 100–599 fails the request as 502 `TUNNEL_PROTOCOL` (real transports never produce one — only a hand-rolled producer frame can), and `sanitizeUpstreamResponseHeaders` drops header names/values that would make Node's `writeHead` throw instead of relaying them into the consumer response.
+
 ## [0.7.1] - 2026-09-09
 
 ### Added
@@ -22,8 +35,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ### Documentation
 
 - **OpenCode consumer setup**: document the `small_model` configuration needed to avoid `429 PRODUCER_MAX_CONCURRENCY` retry loops when OpenCode fires its session-title request on an alias with `maxConcurrencyPerUser = 1`.
-
-## [Unreleased]
 
 ## [0.7.0] - 2026-09-06
 
