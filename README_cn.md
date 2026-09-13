@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.3-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.4-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -341,6 +341,35 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 
 诚实的限制说明：token 类上限只统计上游报告的用量——Ollama 流式响应不带 usage，按 0 计。TPM 和终身预算都是基于已观测用量的阈值，不是预留式硬上限：单个请求可能跨过阈值，先于已有请求用量落库的并发请求还会进一步超额；已记录用量达到阈值后，新请求才会被拒绝。
 
+## 别名备份（hub 侧故障转移）
+
+alias 会以重试救不了的方式死掉：producer 掉线、当日额度烧完、backend 降级、运营者封禁。没有兜底时，指向该 alias 的所有消费者全部中断，直到有人手改 model 名。**别名备份**在 hub 侧解决：运营者为每个 alias 配一条有序的备份 alias 队列，alias 无法服务时 hub 按序重试，全部失败才返回 alias 自己的错误。消费者只配一次 model，永远不用改——备份接管时响应会带 `x-aweshare-fallback: <实际服务的alias>` 头，换用发生在账面上（每次尝试各记一条 usage row，记在实际服务的 alias 名下）和模型诚实审计里（键到应答的 alias）。
+
+两条管理路径，命令和文件写同一份数据：
+
+```toml
+# ~/.aweshare-hub/config.backups.toml — 键 = alias，值 = 有序备份队列
+"peng/qwen3-coder" = ["alice/qwen3-coder", "hub/glm-4.6"]
+```
+
+```bash
+aweshare hub backups                                # 列出全部队列
+aweshare hub backups peng/qwen3-coder               # 看一条
+aweshare hub backups peng/qwen3-coder --add alice/qwen3-coder,hub/glm-4.6
+aweshare hub backups peng/qwen3-coder --add hub/glm-4.6 --first   # 插到队首
+aweshare hub backups peng/qwen3-coder --remove hub/glm-4.6
+aweshare hub backups peng/qwen3-coder --clear
+```
+
+语义刻意保持为一列字面字符串：
+
+- **队列就是写下的内容**——没有隐式跳转，不会展开备份自己的队列，每个条目每次请求至多试一次。条目必须互不重复、不得包含 alias 自身、可以引用尚不存在的 alias（producer 随时上下线）；在请求的线上协议下解析不到 offering 的条目直接跳过。
+- **只在 alias 侧故障时转移**：producer 掉线、backend 降级、alias 被封、共享窗口关闭、当日额度用尽、alias 并发满，以及"已派发但未出响应头"的 relay 失败（tunnel 断开、backend 超时）。响应头一旦到达消费者，流已提交——不做流中切换。消费者自身的问题（限流、探针预算、消费者自己的 token 预算）永不转移：换 alias 救不了消费者自己的限额；`consumer list --ping` 必须如实反映它点名的 alias，所以探针也不转移。
+- **每次尝试都重跑完整准入**——备份 alias 的限额和当日额度照常生效，用量记在备份自己账上，而不是失败的 alias。
+- 全部失败时，返回的是**主 alias 的原始错误**——消费者问的是它，值得解释的也是它。
+
+文件在 hub 数据目录里与 `config.toml` 并排（`~/.aweshare-hub/config.backups.toml`；Docker：`/data/config.backups.toml`），与其他 hub 配置一样热重载——编辑约 2 秒内生效，坏文件记日志并沿用旧队列，启动时遇到非法文件直接拒绝启动。`hub init` 会生成模板（注释齐全、内容为空）。与 `config.toml` 一样是本机文件，不在 admin REST API 里：远程 hub 请在服务器上跑命令（ssh / `docker exec`）或直接改文件。
+
 ## 端点与错误
 
 | 端点 | 说明 |
@@ -367,17 +396,19 @@ curl -X PUT https://hub.example.com/admin/v1/consumers/alice/limits \
 | `aweshare hub init` | 创建数据目录和 admin token（只打印一次） |
 | `aweshare hub serve [--host H] [--port N]` | 启动 hub——唯一 runner；数据目录里有 `config.produce.toml` 就自动挂载：其 `[[backends]]`/`[[offerings]]` 段注册为 `hub/…` offering，由 hub 进程直接服务（key 在数据目录的 secrets.json；改动热加载） |
 | `aweshare hub produce init` | 生成 `config.produce.toml` 脚手架和空 `secrets.json`（已存在则保留）；同时初始化数据目录、数据库、pepper 和 admin token |
-| `aweshare hub admin invite mint [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | 铸造一次性邀请码（`asi_…`，只打印一次，默认 7 天后过期；可用 `list invites --reveal` 重新查看）；`--expires-in` 同时限定其铸造令牌的寿命——到期后认证返回 401 `TOKEN_EXPIRED`、在线隧道在下一个心跳被关闭（`none` 表示码与身份都永不过期；此变更之前铸造的身份永不过期）；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
-| `aweshare hub admin invite revoke N` · `aweshare hub admin invite restore N` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者 |
-| `aweshare hub admin offering revoke ALIAS` · `aweshare hub admin offering restore ALIAS` | 按别名吊销 / 恢复的"手术刀"：吊销一个 offering（该别名的全部协议行）——新请求返回 503 `OFFERING_BLOCKED`，`list offerings` 显示 `blocked`，同 producer 的其他 offering 不受影响。手动吊销在 producer 重新注册后依然保留；自动吊销（模型不符，见 `autoBlockModelMismatch`）在 producer 改报不同的 `upstreamModel` 后自动解除 |
+| `aweshare hub admin invite mint [--role producer\|consumer] [--name NAME] [--count N] [--expires-in D\|none]` | 铸造一次性邀请码（`asi_…`，只打印一次，可用 `list invites --reveal` 重新查看）；`--expires-in`（默认 7d，`none` = 无期限）只限定码的可兑换窗口——兑换出的令牌永不过期，吊销 / 恢复才是它的生命周期开关；producer 码：绑定（`--name`）或不绑定（兑换时提交 name + email，可 `--count` 批量）；consumer 码：始终绑定单个名字 |
+| `aweshare hub admin invite revoke N…` · `aweshare hub admin invite restore N…` | 撤销 / 恢复邀请码——撤销已兑换的码会连带挂起它换出的生产者，restore 救回两者；一次可传多个 id（空格或逗号分隔），一条失败不影响其余 |
+| `aweshare hub admin invite extend N… --expires-in D\|none` | 重置未兑换邀请码的兑换窗口（`none` = 无期限）；已兑换的码返回 `redeemed: true`——令牌永不过期，无需续期 |
+| `aweshare hub admin offering revoke ALIAS…` · `aweshare hub admin offering restore ALIAS…` | 按别名吊销 / 恢复的"手术刀"：吊销 offering（每个别名的全部协议行）——新请求返回 503 `OFFERING_BLOCKED`，`list offerings` 显示 `blocked`，同 producer 的其他 offering 不受影响；一次可传多个别名。手动吊销在 producer 重新注册后依然保留；自动吊销（模型不符，见 `autoBlockModelMismatch`）在 producer 改报不同的 `upstreamModel` 后自动解除 |
 | `aweshare hub list [invites\|producers\|consumers\|offerings\|usage]` | 读 hub 状态，一个名词一张表（默认 invites） |
-| `aweshare hub list invites [--reveal] [--token] [--json]` | 邀请码台账：每个码、它换出的身份与生命周期（pending/used/suspended/revoked/expired；已兑换的码在身份过期后显示 `expired`）；`--reveal` 显码，`--token` 连同铸造令牌与最近活跃一起显示 |
+| `aweshare hub list invites [--reveal] [--token] [--json]` | 邀请码台账：每个码、它换出的身份与生命周期（pending/used/suspended/revoked/expired——`expired` 只指未兑换的码过了兑换窗口，已兑换的身份永不过期）；`--reveal` 显码，`--token` 连同铸造令牌与最近活跃一起显示 |
 | `aweshare hub list producers [--json]` · `aweshare hub list consumers [--json]` | 名册：名字、状态（active/suspended/built-in）、在线与否（producers）、最近活跃、创建时间 |
 | `aweshare hub list offerings [--json]` | 目录：按去重 alias 计数的模型健康（一个别名多协议只算一个、取最差状态），一个别名一行——列与 `consumer list`/`producer list` 完全一致、问题状态在前——含自报模型、限额、实时占用（`IN USE n/max`）与当日剩余 token |
 | `aweshare hub status` | 实时仪表盘：容量（producer 席位、consumer 数、offering 计数）、来自用量汇总的最近 5 分钟请求/成功率/错误行（hub 准入类 429 不计量）、准入拒绝压力（被限流最狠的 alias/消费者）与生效的消费者默认限额 |
-| `aweshare hub limits NAME [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--probe-budget N] [--clear] [--json]` | 查看 / 合并 / 清空某消费者的限额覆盖（未设的键保持全局默认） |
+| `aweshare hub limits NAME… [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--probe-budget N] [--clear] [--json]` | 查看 / 合并 / 清空消费者限额覆盖，一次一个或多个（未设的键保持全局默认） |
+| `aweshare hub backups [ALIAS] [--add A[,A…]] [--first] [--remove A[,A…]] [--clear] [--json]` | 数据目录 `config.backups.toml` 里的按别名故障转移队列（热重载；本机文件，与 `config.toml` 同类）：带 `ALIAS` 看一条，不带列全部；`--add` 追加（逗号分隔多个），`--first` 插队首，`--remove` 删除条目，`--clear` 清掉队列——见「别名备份」 |
 | `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|producer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，最近使用的在最上面——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印；`--sort` 换排序（consumer/producer/model 字母序，tokens/requests 最忙在前） · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
-| `aweshare hub produce refresh NAME [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | 当日中途重开某个 hub 自有模型的 token 额度（`hub/` 前缀可省）：裸调用把今日窗口重新起算，`--add N` 把今日上限提高 N 个 token 直到北京时间午夜，`--clear` 清掉两个标记。仅限 hub 自有（`hub/…`）模型——producer 的模型归它自己刷新。`--all` 一条命令裸刷新全部有日限额的 `hub/…` 模型（无限额的会提示跳过；单个失败不中断其余） |
+| `aweshare hub produce refresh NAME… [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | 当日中途重开 hub 自有模型的 token 额度（`hub/` 前缀可省，一次可传多个名字）：裸调用把今日窗口重新起算，`--add N` 把今日上限提高 N 个 token 直到北京时间午夜，`--clear` 清掉两个标记。仅限 hub 自有（`hub/…`）模型——producer 的模型归它自己刷新。`--all` 一条命令裸刷新全部有日限额的 `hub/…` 模型（无限额的会提示跳过；单个失败不中断其余） |
 
 令牌签发统一走邀请码（两种角色）。`admin`、`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。
 

@@ -59,6 +59,7 @@ Revocation is **reversible suspension**, never deletion, and the invite is the o
 | "How much was used?" | Metering | `aweshare hub list usage [--consumer NAME] [--alias ns/model] [--limit N]` (admin sees everything; the API `GET /admin/v1/usage` also takes producer/consumer keys, each sees its own slice) |
 | "Invite producers without hand-delivering tokens" | Invite codes | `aweshare hub admin invite mint --name NAME` (bound) or `--count N` (unbound); producer redeems via `aweshare producer join` — see Admission via Invite Codes |
 | "Point Claude Code / an SDK at the hub" | Consumer | Explain env vars (see Consumer Setup) |
+| "模型挂了老要手动换 / 配个备用模型" | Alias backups | Per-alias failover queues: `aweshare hub backups` verbs + `config.backups.toml` (see Alias Backups) |
 | "Update aweshare itself", "upgrade the CLI/hub" | Self-Update | `aweshare self-update --check` first, then see Self-Update (npm vs Docker differ) |
 
 ## Config Location
@@ -255,6 +256,14 @@ If the installed `aweshare` doesn't match what the user expects from the reposit
 2. `aweshare self-update --check` — installed vs npm latest ("unknown target" means the install predates 0.2.4, when self-update landed)
 3. Update via `npm install -g aweshare` (or have the user run `aweshare self-update` in their own terminal), then `aweshare -v`
 4. If the mismatch persists, inspect the global package (`npm ls -g aweshare`) to confirm which code is actually running.
+
+## Alias Backups (hub-side failover)
+
+The operator can give each alias an ordered backup queue: when the alias cannot serve (producer offline, daily budget spent, backend degraded, blocked, share window closed, per-alias concurrency full, or a pre-head relay failure), the hub retries the queue in order and only then returns the alias's own error. Consumers configure one model and never touch it again; a backup that serves stamps `x-aweshare-fallback: <served alias>` on the response and the usage row is recorded under the alias that actually served.
+
+- Queue source of truth: `config.backups.toml` in the hub data dir — `alias = [backup, backup, ...]`, same file conventions as `config.toml` (hot-reload ~2s, broken edit keeps previous queues, invalid file fails startup; `hub init` scaffolds it).
+- CLI: `aweshare hub backups` (list) · `backups ALIAS` (view) · `--add A[,A…] [--first]` · `--remove A[,A…]` · `--clear` · `--json`. It edits the local file — like `config.toml`, it is not in the admin REST API; on a remote hub run it there (ssh / `docker exec`).
+- Queue semantics: exactly what was written (no implicit hops, no expansion, each entry once per request); entries must be distinct, not the alias itself; unresolvable entries are skipped. Consumer-side denials (rate limits, probe budget, the consumer's own budget) never fail over, and probes (`--ping`) never fail over — a health check must tell the truth.
 
 ## Trust and Compliance
 

@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-09-13
+
+### Changed
+
+- **Identity expiry removed — `--expires-in` bounds the code's redemption window only**: redeem no longer copies the invite's expiry onto the identity it mints; a redeemed token works until the operator suspends it (revoke/restore stays the only lifecycle handle). Schema v19 drops the `expires_at` columns v12 added from producers and consumers, so every identity the old semantics had expired (401 `TOKEN_EXPIRED`, tunnels closed at the next heartbeat) starts working again on upgrade. Auth never returns `TOKEN_EXPIRED` anymore; `hub list invites` shows redeemed invites as `used` (or `suspended`), and `expired` only marks a pending code whose redemption window closed. `admin invite extend N… --expires-in D|none` still resets a pending code's window; on a redeemed invite it answers `redeemed: true` — nothing to extend.
+
+### Added
+
+- **Batch targets on the admin verbs**: `admin invite revoke|restore|extend`, `admin offering revoke|restore`, `hub limits` and `hub produce refresh` accept several targets per call, space- or comma-separated (`admin invite revoke 18 19 22`). Each target is one admin-API call with its own ✓/✗ line, one failure does not stop the rest, and the run closes with a nonzero exit code when any target failed; a batch revoke ends with a single undo line listing every id it suspended. `--json` keeps the plain object for a single target and prints an array for several.
+
 ## [0.7.3] - 2026-09-10
 
 ### Added
