@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-09-14
+
+### Added
+
+- **One verify gate, locally and in CI** — `pnpm verify` (biome check + tsc build + vitest, in that order) is the single entry point; `ci.yml` and `release.yml` run it instead of their own step lists, so a local run is exactly what CI runs.
+- **Usage summary closes with a TOTAL row** — `aweshare hub list usage` and `aweshare producer list usage` now append one grand-total line summing every group's requests, errors and token counts, with the duration averaged request-weighted (a flat mean of per-group means would weigh a 1-request group same as a 10,000-request one) and LAST USED as the newest row's. `--json` still prints the raw rows only.
+- **`--details` takes the same `--since` window as the summary** — the per-request log (`aweshare hub list usage --details`, `producer list usage --details`, `GET /admin/v1/usage`) accepts `since=30m|12h|7d|all` like the summary, so "today's requests" no longer needs luck with `--limit`; the window is printed above the table. Omitting it still means all time, newest first.
+
+### Changed
+
+- **Usage summary defaults to all time** — `aweshare hub list usage` and `aweshare producer list usage` (and `GET /admin/v1/usage/summary` when `since` is omitted) now aggregate the whole metering history instead of the last 7 days; the window is still printed with the table, so a bare call reads `usage all time — …`. Narrow it back with `--since 30m|12h|7d|…`.
+
+### Fixed
+
+- **`nextShareOpen` performance for distant schedules** — the minute-walk previously iterated up to 370 days forward for far-future share windows; it now jumps to the next candidate boundary and falls back to minute-level only inside the target day, keeping DST transitions exact. A 200-day schedule resolves in ~80 ms instead of timing out.
+- **Failover limiter accounting** — the inflight release was placed before the failover queue ran, so a consumer could exceed `consumerMaxConcurrent` while the hub cycled through aliases. The limiter now releases exactly once, after the queue succeeds or is exhausted.
+- **`BACKEND_LOGIN` no longer leaks local paths** — a failed Codex login now sends only the error kind to the hub; the producer's local login file path is kept on the producer and does not appear in relayed error frames.
+
 ## [0.7.4] - 2026-09-13
 
 ### Changed

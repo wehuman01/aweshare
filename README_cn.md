@@ -14,7 +14,7 @@
     <a href="https://ko-fi.com/mugpeng"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
   </p>
   <p>
-     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.4-7C3AED?style=flat-square" alt="Version"></a>
+     <a href="https://github.com/wehuman01/aweshare-source/releases"><img src="https://img.shields.io/badge/version-0.7.5-7C3AED?style=flat-square" alt="Version"></a>
     <a href="https://github.com/wehuman01/aweshare"><img src="https://img.shields.io/badge/node-%E2%89%A522-0EA5E9?style=flat-square" alt="Node"></a>
     <a href="https://github.com/wehuman01/aweshare/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-proprietary-E34F26?style=flat-square" alt="License"></a>
     <a href="https://www.npmjs.com/package/aweshare"><img src="https://img.shields.io/badge/npm-aweshare-7C3AED?style=flat-square" alt="npm package"></a>
@@ -379,11 +379,11 @@ aweshare hub backups peng/qwen3-coder --clear
 | `GET /v1/catalog` | hub 全部 offering——生产者、别名、协议、状态、按别名的限额、即时在途占用（`activeUsers`/`activeRequests`）及当日已用/剩余 token（`aweshare consumer list` 的发现视图） |
 | `GET /healthz` | 存活探测 |
 | `GET /admin/v1/offerings` | 已注册 offerings 及实时状态、限额、即时在途占用、当日已用 token——admin 全量，生产者令牌只看自己那份（`aweshare producer list`） |
-| `/admin/v1/*` | 令牌/限额/用量管理（admin 或生产者令牌）· 用量：`GET /admin/v1/usage`（新在前的逐请求日志）与 `GET /admin/v1/usage/summary`（`group=consumer-alias\|consumer\|alias`、`since=30m\|12h\|7d\|all`，默认 7d、`consumer`/`producer`/`alias` 过滤；每种角色各看自己那份） · 消费者限制覆盖：`GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`（仅 admin） |
+| `/admin/v1/*` | 令牌/限额/用量管理（admin 或生产者令牌）· 用量：`GET /admin/v1/usage`（新在前的逐请求日志，支持同样的 `since` 窗口）与 `GET /admin/v1/usage/summary`（`group=consumer-alias\|consumer\|alias`、`since=30m\|12h\|7d\|all`，默认 `all`、`consumer`/`producer`/`alias` 过滤；每种角色各看自己那份） · 消费者限制覆盖：`GET`/`PUT`/`DELETE /admin/v1/consumers/{name}/limits`（仅 admin） |
 
 错误语义：`401` 无效密钥 · `401 TOKEN_REVOKED` 令牌被挂起（请联系运维者 restore） · `403 HUB_FULL` 生产者容量已满 · `404` 别名不存在 · `400 PROTOCOL_MISMATCH` 协议/别名不匹配 · `429` 限流、TPM 超限或超生产者并发（`PRODUCER_MAX_USERS` = 不同消费者数上限；`QUOTA_EXCEEDED` = 终身或每日 token 预算用尽） · `502` 上游/隧道错误（上游 4xx/5xx 原样透传） · `503` 生产者离线/后端降级 · `504` 超时。所有错误带 `{error:{code,message,requestId}}`，requestId 贯穿两侧日志。
 
-用量记录：每请求一行（别名、声明的上游模型、可用时的响应自报模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。`aweshare hub list usage`（生产者机器上则是 `aweshare producer list usage`，自动限定在自己模型那份）默认就回答"谁用了多少"：聚合在 hub 的 SQLite 上完成，按 消费者 × 模型 一行，**最近使用的排在最上面**——给出请求数、错误数、尽力提取的 token 总量、未知 token 行数（不回报用量的流式后端）与平均耗时。窗口默认 7 天并随表头打印（`--since 30m\|12h\|7d\|…\|all`）；`--group-by consumer` 收粗到每人一行，`--group-by alias` 收粗到每模型一行；`--sort` 换排序（`consumer`/`producer`/`model` 按该列字母序、同列内新在前；`tokens`/`requests` 最忙在前——tokens 仍把同一个人的行聚在一起，即 0.6.1 之前的默认排序）。`--details` 切到逐请求日志（`GET /admin/v1/usage`；admin 全量，生产者/消费者各看自己那份，行内带消费者/生产者名字）。
+用量记录：每请求一行（别名、声明的上游模型、可用时的响应自报模型、状态、时长、字节数、token 数尽力提取），**内容零落库**。`aweshare hub list usage`（生产者机器上则是 `aweshare producer list usage`，自动限定在自己模型那份）默认就回答"谁用了多少"：聚合在 hub 的 SQLite 上完成，按 消费者 × 模型 一行，**最近使用的排在最上面**——给出请求数、错误数、尽力提取的 token 总量、未知 token 行数（不回报用量的流式后端）与平均耗时，表尾以 TOTAL 行汇总全部分组（耗时按请求数加权平均）。窗口默认全部历史并随表头打印（`--since 30m\|12h\|7d\|…\|all`）；`--group-by consumer` 收粗到每人一行，`--group-by alias` 收粗到每模型一行；`--sort` 换排序（`consumer`/`producer`/`model` 按该列字母序、同列内新在前；`tokens`/`requests` 最忙在前——tokens 仍把同一个人的行聚在一起，即 0.6.1 之前的默认排序）。`--details` 切到逐请求日志（`GET /admin/v1/usage`，支持同样的 `--since` 窗口；admin 全量，生产者/消费者各看自己那份，行内带消费者/生产者名字）。
 
 ## 常用命令
 
@@ -407,7 +407,7 @@ aweshare hub backups peng/qwen3-coder --clear
 | `aweshare hub status` | 实时仪表盘：容量（producer 席位、consumer 数、offering 计数）、来自用量汇总的最近 5 分钟请求/成功率/错误行（hub 准入类 429 不计量）、准入拒绝压力（被限流最狠的 alias/消费者）与生效的消费者默认限额 |
 | `aweshare hub limits NAME… [--rps N] [--burst N] [--max-concurrent N] [--tpm N] [--max-total-tokens N] [--probe-budget N] [--clear] [--json]` | 查看 / 合并 / 清空消费者限额覆盖，一次一个或多个（未设的键保持全局默认） |
 | `aweshare hub backups [ALIAS] [--add A[,A…]] [--first] [--remove A[,A…]] [--clear] [--json]` | 数据目录 `config.backups.toml` 里的按别名故障转移队列（热重载；本机文件，与 `config.toml` 同类）：带 `ALIAS` 看一条，不带列全部；`--add` 追加（逗号分隔多个），`--first` 插队首，`--remove` 删除条目，`--clear` 清掉队列——见「别名备份」 |
-| `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|producer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，最近使用的在最上面——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时；窗口默认 7d 并随表头打印；`--sort` 换排序（consumer/producer/model 字母序，tokens/requests 最忙在前） · `--details`：逐请求日志，新在前，内容零落库，每行标明消费者 |
+| `aweshare hub list usage [--details] [--consumer NAME] [--producer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|producer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了多少（默认）：按 消费者 ×模型 聚合，最近使用的在最上面——请求数、错误数、成功率、尽力提取的 token 总量、未知 token 行数、平均耗时，表尾 TOTAL 行汇总；窗口默认全部并随表头打印；`--sort` 换排序（consumer/producer/model 字母序，tokens/requests 最忙在前） · `--details`：逐请求日志，新在前，同样的 `--since` 窗口，内容零落库，每行标明消费者 |
 | `aweshare hub produce refresh NAME… [--add N] [--clear] [--json]` · `aweshare hub produce refresh --all [--json]` | 当日中途重开 hub 自有模型的 token 额度（`hub/` 前缀可省，一次可传多个名字）：裸调用把今日窗口重新起算，`--add N` 把今日上限提高 N 个 token 直到北京时间午夜，`--clear` 清掉两个标记。仅限 hub 自有（`hub/…`）模型——producer 的模型归它自己刷新。`--all` 一条命令裸刷新全部有日限额的 `hub/…` 模型（无限额的会提示跳过；单个失败不中断其余） |
 
 令牌签发统一走邀请码（两种角色）。`admin`、`limits` 与 `usage` 是 admin REST API（`/admin/v1/*`，见「端点与错误」）的薄封装，curl 同样可用。
@@ -423,7 +423,7 @@ aweshare hub backups peng/qwen3-coder --clear
 | `aweshare producer config path` · `config show` · `config edit` | 定位 / 查看（密钥打码）/ 编辑配置 |
 | `aweshare producer doctor [--status]` | 端到端诊断：后台实例、配置、后端探测、hub（含你的 offerings 有多少已注册）、最近日志（`--status` 跳过网络探测，秒回） |
 | `aweshare producer list [offerings] [--json] [--all]` | 查看本 producer 在 hub 上注册了什么——别名、协议、实时状态、限额、即时占用（`IN USE`，此刻在用的不同消费者数）、当日 token 用量——外加本地后台实例状态与和 config.toml 的漂移（hubUrl/token 取自 config.toml）；`--all`：全部 producer 的注册情况（发现视图） |
-| `aweshare producer list usage [--details] [--consumer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了本 producer 的模型（producer 令牌把 hub 计量限定在自己那份）：默认按 消费者 × 模型 聚合，最近使用的在最上面（`--sort` 换排序），窗口默认 7d · `--details`：逐请求日志，新在前，每行标明消费者 |
+| `aweshare producer list usage [--details] [--consumer NAME] [--alias ns/model] [--group-by consumer-alias\|consumer\|alias] [--since 7d\|all] [--sort time\|consumer\|model\|tokens\|requests] [--limit N] [--json]` | 谁用了本 producer 的模型（producer 令牌把 hub 计量限定在自己那份）：默认按 消费者 × 模型 聚合，最近使用的在最上面（`--sort` 换排序），表尾 TOTAL 行汇总，窗口默认全部 · `--details`：逐请求日志，新在前，同样的 `--since` 窗口，每行标明消费者 |
 | `aweshare producer status` | 一眼摘要：本地进程、配置计数、已注册模型健康汇总与漂移——完整表格看 `list offerings` |
 | `aweshare producer start [--background \| --install]` | 连接并转发（长驻进程；`--background` 转入后台——日志写 `~/.aweshare/producer.log`，pid 写 `producer.pid`；`--install` 安装并启动 launchd/systemd 服务，支持开机自启和崩溃拉起） |
 | `aweshare producer reload` | 通知后台 producer（SIGHUP）重读 `config.toml` + `secrets.json`，并在既有隧道上重新注册 offerings——不断连；配置有误时保留旧值继续服务 |

@@ -33,6 +33,7 @@ In practice: plain exported functions over classes (custom `Error` subclasses ar
 
 ```bash
 pnpm install
+pnpm verify      # the gate CI runs: check + build + test, in that order
 pnpm test        # vitest, whole suite
 pnpm build       # tsc -b, whole monorepo
 pnpm check       # biome (format + lint)
