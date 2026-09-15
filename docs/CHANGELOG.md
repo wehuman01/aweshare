@@ -3,7 +3,15 @@
 All notable changes to aweshare are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [semver](https://semver.org/).
 
-## [Unreleased]
+## [0.7.6] - 2026-09-15
+
+### Added
+
+- **Admission queueing for the per-user slot (`queueWaitMs`)** — a request that finds its consumer's `maxConcurrencyPerUser` slot busy no longer 429s at once: it parks at the hub for up to `queueWaitMs` (env `AWESHARE_QUEUE_WAIT_MS`, config.toml `queueWaitMs`, default 10000, `0` = the old reject-immediately behavior; hot-reloads) and is admitted the moment the slot frees. Short same-key overlaps — opencode's background title request racing the main one, a second window starting up — now resolve invisibly; only a slot still busy after the window answers 429 `PRODUCER_MAX_CONCURRENCY`, with the denial naming how long it waited and reminding that every in-flight request from the key counts. The wait budget is one deadline shared across the alias's backup queue (attempts don't stack), probes never wait (`consumer list --ping` answers fast and tells the truth), a client that hangs up while queued is dropped without dispatching, `hub status` shows the setting, and each realized wait is logged. Waiting holds no upstream resources, only the HTTP connection. `maxConcurrentUsers` still denies immediately — cross-consumer contention is a different problem and queueing it would trade one user's latency for another's fairness.
+
+### Changed
+
+- **Auto-offline offerings degraded past 120h** — a backend that has been continuously degraded for `offlineAfterMs` (env `AWESHARE_OFFLINE_AFTER_MS`, config.toml `offlineAfterMs`, default `432000000` = 120h, `0` = stay degraded forever; hot-reloads) now renders as `offline` in `consumer list`, `hub list offerings`, `producer list`, `/v1/catalog` and the underlying `serializeOffering` (display + catalog only — dispatch was already cut at degraded, recovery probes keep running, and a late success brings the offering straight back to online). Per offering, never per producer: the producer's other models are untouched. The 503 message now names how long the backend has been dead when the streak crosses the threshold.
 
 ## [0.7.5] - 2026-09-14
 
